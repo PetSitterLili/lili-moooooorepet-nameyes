@@ -4,6 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="robots" content="noindex, nofollow">
+    
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="mobile-web-app-capable" content="yes">
+    
     <title>多案場毛孩 CRM 點名工作台</title>
     <style>
         *, *::before, *::after { box-sizing: border-box; }
@@ -94,7 +99,7 @@
             transition: all 0.2s ease;
             text-align: center;
         }
-        .btn-reset-attendance { background-color: #d9825b; color: white; } /* 只清空勾勾 */
+        .btn-reset-attendance { background-color: #d9825b; color: white; }
         .btn-lock { background-color: #b5945b; color: white; }
         .btn-lock.is-locked { background-color: #6c757d; }
         .btn-print { background-color: #50415a; color: white; }
@@ -177,7 +182,6 @@
             background-color: #ffffff; font-family: inherit;
         }
         
-        /* 唯讀狀態下的 UI 樣式鎖定 */
         .is-locked-mode input, .is-locked-mode textarea {
             background-color: #f1ede7 !important;
             border-color: #e2ded8 !important;
@@ -197,6 +201,7 @@
             border: 1px solid #eae5df; border-radius: 6px; background-color: #faf9f6; resize: none;
         }
 
+        /* 需求 2(1)：網頁版底部溫暖小語更新 */
         .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
 
         /* --------------------------------------------------- */
@@ -214,15 +219,16 @@
                 padding-bottom: 12px;
                 margin-bottom: 20px;
             }
-            .print-header h1 { font-family: serif; color: #50415a; font-size: 20pt; margin: 0 0 4px 0; }
-            .print-header p { color: #b5945b; font-size: 10pt; margin: 0; font-style: italic; }
+            /* 需求 2(2)：檔案標頭格式調整 */
+            .print-header h1 { font-family: serif; color: #50415a; font-size: 18pt; margin: 0 0 4px 0; }
+            .print-header p { color: #b5945b; font-size: 9pt; margin: 0; font-style: italic; }
 
             .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 24px !important; page-break-inside: avoid; }
             .section-header { border-bottom: 2px solid #50415a !important; margin-bottom: 12px !important; }
             .section-title-input { font-size: 13pt !important; border: none !important; font-weight: bold !important; color: #50415a !important; background: transparent !important;}
 
             .cat-card { page-break-inside: avoid; border: 1px solid #eae5df !important; background-color: #ffffff !important; margin-bottom: 10px !important; padding: 10px !important; }
-            .cat-card.empty-target { display: none !important; } /* 名字為空自動隱藏 */
+            .cat-card.empty-target { display: none !important; }
 
             .cat-name-input { border: none !important; padding: 0 !important; font-size: 12pt !important; font-weight: bold !important; background: transparent !important;}
             .cat-desc-textarea { border: none !important; padding: 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important;}
@@ -235,7 +241,13 @@
             .photo-box { width: 55px !important; height: 55px !important; border: 1px solid #b5945b !important; }
             .section-summary { border-top: 1px solid #eae5df !important; page-break-inside: avoid; }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
-            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; text-align: center; border-top: 1px solid #eae5df; padding-top: 8px; font-size: 8.5pt !important; color: #888888 !important; }
+            
+            /* 需求 2(1)：雙欄對齊雙邊美化列印頁尾 */
+            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; }
+            .print-footer-table { display: table; width: 100%; border-top: 1px solid #eae5df; padding-top: 10px; }
+            .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; }
+            .print-footer-right { display: table-cell; vertical-align: bottom; text-align: right; width: 220px; font-size: 8.5pt !important; color: #666666 !important; line-height: 1.3; }
+            .print-qrcode { width: 50px; height: 50px; margin-top: 4px; border: 1px solid #eae5df; padding: 2px; background: #ffffff; display: inline-block; }
         }
         .print-header, .print-check-badge, .print-footer { display: none; }
     </style>
@@ -243,12 +255,11 @@
 <body>
 
     <div class="print-header">
-        <h1 id="print-main-title">嘉義寵物保姆 // 到府服務日誌</h1>
+        <h1 id="print-main-title">嘉義寵物保姆ㄌㄌ // [案場名]名冊</h1>
         <p id="print-sub-title">Chapter 00. Attendance Checklist</p>
     </div>
 
-    <div class="tabs-container" id="tabs-bar">
-        </div>
+    <div class="tabs-container" id="tabs-bar"></div>
 
     <div class="header-panel" id="control-panel">
         <div class="case-title-row">
@@ -264,14 +275,25 @@
 
     <div id="app-content"></div>
 
-    <div class="app-footer-quote">「慢步調陪伴，讓孩子在咀嚼與吞嚥間感受最溫柔的守護。」</div>
-    <div class="print-footer">「慢步調陪伴，讓孩子在咀嚼與吞嚥間感受最溫柔的守護。」｜ 歡迎追蹤 ㄌㄌ</div>
+    <div class="app-footer-quote">「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」</div>
+    
+    <div class="print-footer">
+        <div class="print-footer-table">
+            <div class="print-footer-left">
+                「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」
+            </div>
+            <div class="print-footer-right">
+                <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank" style="text-decoration: none; color: inherit;">
+                    <div>歡迎追蹤 ㄌㄌ，因為你家小寶貝有可能上鏡頭喔！</div>
+                    <img class="print-qrcode" src="IGQRCODE.png" onerror="this.src='IGQRCODE.jpg'" alt="IG QRCODE">
+                </a>
+            </div>
+        </div>
+    </div>
 
     <script>
-        // CRM 核心架構資料庫密鑰
         const STORAGE_KEY = "lili_pet_crm_v2_data";
         
-        // 初始結構範本 (3區各12隻貓，共36格)
         const SECTION_TEMPLATES = [
             { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 12 },
             { id: "sec_2", title: "2樓空間 / 房間（點擊編輯名稱）", slots: 12 },
@@ -283,13 +305,11 @@
             tabs: {}
         };
 
-        // 載入資料庫
         function loadDatabase() {
             const dataStr = localStorage.getItem(STORAGE_KEY);
             if (dataStr) {
                 CRM_STORE = JSON.parse(dataStr);
             } else {
-                // 預載預設的第一個19貓家庭案場
                 const defaultId = "tab_" + Date.now();
                 CRM_STORE.activeTabId = defaultId;
                 CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
@@ -306,7 +326,7 @@
         function createBlankTabData(name) {
             let tabData = {
                 name: name,
-                isLocked: true, // 預設鎖定，防止現場誤觸
+                isLocked: true, 
                 sections: {},
                 cats: {}
             };
@@ -320,7 +340,6 @@
             return tabData;
         }
 
-        // 渲染分頁列
         function renderTabs() {
             const bar = document.getElementById("tabs-bar");
             bar.innerHTML = "";
@@ -339,7 +358,6 @@
                 bar.appendChild(tabEl);
             });
 
-            // 新增案場按鈕
             const addEl = document.createElement("div");
             addEl.className = "tab-add";
             addEl.innerText = "＋ 新增案場";
@@ -357,7 +375,6 @@
             bar.appendChild(addEl);
         }
 
-        // 渲染目前當前活化的家庭案場內容
         function renderActiveContent() {
             const activeId = CRM_STORE.activeTabId;
             const content = document.getElementById("app-content");
@@ -371,7 +388,6 @@
             const data = CRM_STORE.tabs[activeId];
             document.getElementById("current-case-display").innerText = `案場：${data.name}`;
             
-            // 更新鎖定按鈕外觀
             const lockBtn = document.getElementById("lock-btn");
             if (data.isLocked) {
                 lockBtn.innerText = "解鎖編輯檔案";
@@ -381,7 +397,6 @@
                 lockBtn.classList.remove("is-locked");
             }
 
-            // 生成貨架
             SECTION_TEMPLATES.forEach(sec => {
                 const secData = data.sections[sec.id];
                 let sectionHTML = `
@@ -432,7 +447,6 @@
             });
         }
 
-        // 資料同步控制器
         function updateTextData(secId, key, val) {
             CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId][key] = val;
             saveDatabase();
@@ -442,7 +456,6 @@
             const activeId = CRM_STORE.activeTabId;
             CRM_STORE.tabs[activeId].cats[slotId][key] = val;
             
-            // 即時同步列印過濾標籤
             const card = document.getElementById(`card_${slotId}`);
             if (key === 'name') {
                 if (val.trim() !== "") card.classList.remove("empty-target");
@@ -451,9 +464,8 @@
             saveDatabase();
         }
 
-        // 現場日常：只清空點名打勾，保留圖文檔案
         function resetAttendanceOnly() {
-            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
+            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
                 const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
                 Object.keys(data.cats).forEach(slotId => {
                     data.cats[slotId].checked = false;
@@ -463,7 +475,6 @@
             }
         }
 
-        // 現場切換點名打勾防呆
         function toggleAttendance(slotId) {
             const chk = document.getElementById(`check_${slotId}`);
             const card = document.getElementById(`card_${slotId}`);
@@ -483,7 +494,6 @@
             saveDatabase();
         }
 
-        // 切換檔案編輯鎖定狀態
         function toggleLockState() {
             const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
             data.isLocked = !data.isLocked;
@@ -491,13 +501,11 @@
             renderActiveContent();
         }
 
-        // 觸發上傳檔案
         function triggerFileUpload(slotId) {
-            if (CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked) return; // 鎖定狀態下無法上傳修改照片
+            if (CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked) return; 
             document.getElementById(`file_${slotId}`).click();
         }
 
-        // 照片強效前端流式壓縮，防爆記憶體上限
         function compressPhoto(event, slotId) {
             const file = event.target.files[0];
             if (!file) return;
@@ -507,7 +515,7 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_BOUND = 300; // 高規縮圖尺寸
+                    const MAX_BOUND = 300; 
                     let width = img.width;
                     let height = img.height;
 
@@ -521,7 +529,7 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    const base64Result = canvas.toDataURL('image/jpeg', 0.6); // 壓縮率0.6平衡畫質與極小體積
+                    const base64Result = canvas.toDataURL('image/jpeg', 0.6); 
                     
                     document.getElementById(`img_${slotId}`).src = base64Result;
                     document.getElementById(`img_${slotId}`).style.display = "block";
@@ -535,7 +543,6 @@
             reader.readAsDataURL(file);
         }
 
-        // 徹底卸載刪除特定家庭分頁
         function deleteCurrentTab() {
             const activeId = CRM_STORE.activeTabId;
             const name = CRM_STORE.tabs[activeId].name;
@@ -557,12 +564,10 @@
             }
         }
 
-        // 動態精準抓取時間與修改檔名
         function triggerPrintPDF() {
             const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
             const now = new Date();
             
-            // 格式化當前系統時間
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const date = String(now.getDate()).padStart(2, '0');
@@ -571,18 +576,16 @@
             const timeString = `${year}/${month}/${date} ${hours}:${minutes}`;
             const fileDate = `${year}${month}${date}_${hours}${minutes}`;
 
-            // 置換 A4 列印頁首時間
             document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
-            document.getElementById("print-main-title").innerText = `${data.name} // 到府點名服務日誌`;
+            
+            /* 需求 2(2)：匯出時動態調整 A4 表頭文字格式 */
+            document.getElementById("print-main-title").innerText = `嘉義寵物保姆ㄌㄌ // ${data.name}名冊`;
 
-            // 戰略破局點：動態修改瀏覽器 Title，讓另存 PDF 的預設檔名直接完美格式化
             const originalTitle = document.title;
             document.title = `【到府日誌】_${data.name}_${fileDate}`;
 
-            // 呼叫系統列印
             window.print();
 
-            // 列印完畢後切換回網頁版標題
             setTimeout(() => {
                 document.title = originalTitle;
             }, 1000);
