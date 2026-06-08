@@ -201,7 +201,6 @@
             border: 1px solid #eae5df; border-radius: 6px; background-color: #faf9f6; resize: none;
         }
 
-        /* 需求 2(1)：網頁版底部溫暖小語更新 */
         .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
 
         /* --------------------------------------------------- */
@@ -219,7 +218,6 @@
                 padding-bottom: 12px;
                 margin-bottom: 20px;
             }
-            /* 需求 2(2)：檔案標頭格式調整 */
             .print-header h1 { font-family: serif; color: #50415a; font-size: 18pt; margin: 0 0 4px 0; }
             .print-header p { color: #b5945b; font-size: 9pt; margin: 0; font-style: italic; }
 
@@ -242,7 +240,6 @@
             .section-summary { border-top: 1px solid #eae5df !important; page-break-inside: avoid; }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
             
-            /* 需求 2(1)：雙欄對齊雙邊美化列印頁尾 */
             .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; }
             .print-footer-table { display: table; width: 100%; border-top: 1px solid #eae5df; padding-top: 10px; }
             .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; }
@@ -305,13 +302,24 @@
             tabs: {}
         };
 
+        /* V2.1 戰略優化：加入絕對防炸 Try-Catch 機制，確保舊資料損壞時網頁依然能正常初始化渲染 */
         function loadDatabase() {
-            const dataStr = localStorage.getItem(STORAGE_KEY);
-            if (dataStr) {
-                CRM_STORE = JSON.parse(dataStr);
-            } else {
+            try {
+                const dataStr = localStorage.getItem(STORAGE_KEY);
+                if (dataStr) {
+                    CRM_STORE = JSON.parse(dataStr);
+                }
+                // 強效結構安全閥：如果讀取出的資料不符合分頁規格，強制啟動重置，防止網頁卡死
+                if (!CRM_STORE || !CRM_STORE.tabs || typeof CRM_STORE.tabs !== 'object') {
+                    throw new Error("Data structure invalid");
+                }
+            } catch (e) {
+                // 發生任何錯誤，直接初始化最乾淨、正確的空白數據架構
                 const defaultId = "tab_" + Date.now();
-                CRM_STORE.activeTabId = defaultId;
+                CRM_STORE = {
+                    activeTabId: defaultId,
+                    tabs: {}
+                };
                 CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
                 saveDatabase();
             }
@@ -439,7 +447,7 @@
                         </div>
                         <div class="section-summary ${data.isLocked ? 'is-locked-mode' : ''}">
                             <div class="summary-title">📌 區域重點備忘 / 禁忌小結</div>
-                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌或動線備忘..." ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary}</textarea>
+                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌 or 動線備忘..." ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary}</textarea>
                         </div>
                     </div>
                 `;
@@ -465,7 +473,7 @@
         }
 
         function resetAttendanceOnly() {
-            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
+            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
                 const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
                 Object.keys(data.cats).forEach(slotId => {
                     data.cats[slotId].checked = false;
@@ -577,8 +585,6 @@
             const fileDate = `${year}${month}${date}_${hours}${minutes}`;
 
             document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
-            
-            /* 需求 2(2)：匯出時動態調整 A4 表頭文字格式 */
             document.getElementById("print-main-title").innerText = `嘉義寵物保姆ㄌㄌ // ${data.name}名冊`;
 
             const originalTitle = document.title;
