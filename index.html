@@ -1,0 +1,594 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="robots" content="noindex, nofollow">
+    <title>多案場毛孩 CRM 點名工作台</title>
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
+            background-color: #f6f5f2;
+            color: #333333;
+            margin: 0;
+            padding: 20px 12px 100px 12px;
+            line-height: 1.5;
+        }
+
+        /* 頂部導覽與分頁標籤 */
+        .tabs-container {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+        }
+        .tab {
+            padding: 10px 16px;
+            background-color: #eae5df;
+            border-radius: 8px 8px 0 0;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666666;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            border: 1px solid #eae5df;
+            border-bottom: none;
+        }
+        .tab.active {
+            background-color: #ffffff;
+            color: #50415a;
+            border-color: #eae5df;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        .tab-add {
+            padding: 10px 14px;
+            background-color: #50415a;
+            color: #ffffff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        /* 控制台 */
+        .header-panel {
+            background-color: #ffffff;
+            border-radius: 0 0 16px 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            border: 1px solid #eae5df;
+            margin-top: -13px;
+        }
+        .case-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #f0ede9;
+            padding-bottom: 12px;
+        }
+        .case-name-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #50415a;
+        }
+        .control-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+        .btn-reset-attendance { background-color: #d9825b; color: white; } /* 只清空勾勾 */
+        .btn-lock { background-color: #b5945b; color: white; }
+        .btn-lock.is-locked { background-color: #6c757d; }
+        .btn-print { background-color: #50415a; color: white; }
+        .btn-delete { background-color: #c94a4a; color: white; max-width: 90px; font-size: 12px; }
+
+        /* 區域區塊 */
+        .section-block {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            border: 1px solid #eae5df;
+        }
+        .section-header {
+            border-bottom: 2px solid #eae5df;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+        }
+        .section-title-input {
+            font-size: 16px;
+            font-weight: bold;
+            color: #50415a;
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 4px;
+            border-bottom: 1px dashed #b5945b;
+        }
+        .section-title-input:focus { outline: none; border-bottom: 1px solid #50415a; }
+
+        /* 貓咪卡片 */
+        .cat-card {
+            border: 1px solid #f0ede9;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background-color: #faf9f6;
+            position: relative;
+        }
+        .cat-card.checked {
+            background-color: #f1f8f3;
+            border-color: #c2e2cc;
+        }
+        .cat-row { display: flex; gap: 12px; align-items: flex-start; }
+        .cat-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            min-width: 70px;
+        }
+        .cat-checkbox { width: 30px; height: 30px; cursor: pointer; accent-color: #4a9e67; }
+        
+        .photo-box {
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            border: 2px dashed #b5945b;
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
+        .photo-box img { width: 100%; height: 100%; object-fit: cover; }
+        .photo-placeholder { font-size: 20px; color: #b5945b; }
+        .file-input { display: none; }
+
+        .cat-right { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .cat-name-input {
+            width: 100%; font-size: 14px; font-weight: bold; padding: 6px 8px;
+            border: 1px solid #eae5df; border-radius: 6px; background-color: #ffffff;
+        }
+        .cat-desc-textarea {
+            width: 100%; height: 60px; font-size: 13px; padding: 6px 8px;
+            border: 1px solid #eae5df; border-radius: 6px; resize: none;
+            background-color: #ffffff; font-family: inherit;
+        }
+        
+        /* 唯讀狀態下的 UI 樣式鎖定 */
+        .is-locked-mode input, .is-locked-mode textarea {
+            background-color: #f1ede7 !important;
+            border-color: #e2ded8 !important;
+            color: #555555 !important;
+            cursor: not-allowed;
+        }
+        .is-locked-mode .photo-box {
+            border-style: solid;
+            background-color: #eae5df;
+            cursor: not-allowed;
+        }
+
+        .section-summary { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #eae5df; }
+        .summary-title { font-size: 12px; font-weight: bold; color: #b5945b; margin-bottom: 6px; }
+        .summary-textarea {
+            width: 100%; height: 60px; font-size: 13px; padding: 8px;
+            border: 1px solid #eae5df; border-radius: 6px; background-color: #faf9f6; resize: none;
+        }
+
+        .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
+
+        /* --------------------------------------------------- */
+        /* 列印美化規則 (A4 PDF) */
+        /* --------------------------------------------------- */
+        @media print {
+            @page { size: A4; margin: 15mm 12mm; }
+            body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; }
+            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote { display: none !important; }
+            
+            .print-header {
+                display: block !important;
+                text-align: center;
+                border-bottom: 1px solid #50415a;
+                padding-bottom: 12px;
+                margin-bottom: 20px;
+            }
+            .print-header h1 { font-family: serif; color: #50415a; font-size: 20pt; margin: 0 0 4px 0; }
+            .print-header p { color: #b5945b; font-size: 10pt; margin: 0; font-style: italic; }
+
+            .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 24px !important; page-break-inside: avoid; }
+            .section-header { border-bottom: 2px solid #50415a !important; margin-bottom: 12px !important; }
+            .section-title-input { font-size: 13pt !important; border: none !important; font-weight: bold !important; color: #50415a !important; background: transparent !important;}
+
+            .cat-card { page-break-inside: avoid; border: 1px solid #eae5df !important; background-color: #ffffff !important; margin-bottom: 10px !important; padding: 10px !important; }
+            .cat-card.empty-target { display: none !important; } /* 名字為空自動隱藏 */
+
+            .cat-name-input { border: none !important; padding: 0 !important; font-size: 12pt !important; font-weight: bold !important; background: transparent !important;}
+            .cat-desc-textarea { border: none !important; padding: 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important;}
+
+            .cat-checkbox { display: none !important; }
+            .print-check-badge { display: block !important; font-size: 9pt !important; font-weight: bold !important; padding: 2px 6px; border-radius: 4px; text-align: center; white-space: nowrap; }
+            .badge-yes { color: #4a9e67 !important; border: 1px solid #c2e2cc; background-color: #f1f8f3 !important; }
+            .badge-no { color: #c94a4a !important; border: 1px solid #f5c6c6; background-color: #fdf2f2 !important; }
+
+            .photo-box { width: 55px !important; height: 55px !important; border: 1px solid #b5945b !important; }
+            .section-summary { border-top: 1px solid #eae5df !important; page-break-inside: avoid; }
+            .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
+            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; text-align: center; border-top: 1px solid #eae5df; padding-top: 8px; font-size: 8.5pt !important; color: #888888 !important; }
+        }
+        .print-header, .print-check-badge, .print-footer { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="print-header">
+        <h1 id="print-main-title">嘉義寵物保姆 // 到府服務日誌</h1>
+        <p id="print-sub-title">Chapter 00. Attendance Checklist</p>
+    </div>
+
+    <div class="tabs-container" id="tabs-bar">
+        </div>
+
+    <div class="header-panel" id="control-panel">
+        <div class="case-title-row">
+            <div class="case-name-display" id="current-case-display">目前無案場</div>
+            <button class="btn btn-delete" onclick="deleteCurrentTab()">刪除此案場</button>
+        </div>
+        <div class="control-buttons">
+            <button class="btn btn-reset-attendance" onclick="resetAttendanceOnly()">今日點名重置 (保留圖文)</button>
+            <button class="btn btn-lock" id="lock-btn" onclick="toggleLockState()">解鎖編輯檔案</button>
+            <button class="btn btn-print" onclick="triggerPrintPDF()">匯出美形 A4 PDF</button>
+        </div>
+    </div>
+
+    <div id="app-content"></div>
+
+    <div class="app-footer-quote">「慢步調陪伴，讓孩子在咀嚼與吞嚥間感受最溫柔的守護。」</div>
+    <div class="print-footer">「慢步調陪伴，讓孩子在咀嚼與吞嚥間感受最溫柔的守護。」｜ 歡迎追蹤 ㄌㄌ</div>
+
+    <script>
+        // CRM 核心架構資料庫密鑰
+        const STORAGE_KEY = "lili_pet_crm_v2_data";
+        
+        // 初始結構範本 (3區各12隻貓，共36格)
+        const SECTION_TEMPLATES = [
+            { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 12 },
+            { id: "sec_2", title: "2樓空間 / 房間（點擊編輯名稱）", slots: 12 },
+            { id: "sec_3", title: "3樓空間 / 其他區（點擊編輯名稱）", slots: 12 }
+        ];
+
+        let CRM_STORE = {
+            activeTabId: "",
+            tabs: {}
+        };
+
+        // 載入資料庫
+        function loadDatabase() {
+            const dataStr = localStorage.getItem(STORAGE_KEY);
+            if (dataStr) {
+                CRM_STORE = JSON.parse(dataStr);
+            } else {
+                // 預載預設的第一個19貓家庭案場
+                const defaultId = "tab_" + Date.now();
+                CRM_STORE.activeTabId = defaultId;
+                CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+                saveDatabase();
+            }
+            renderTabs();
+            renderActiveContent();
+        }
+
+        function saveDatabase() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(CRM_STORE));
+        }
+
+        function createBlankTabData(name) {
+            let tabData = {
+                name: name,
+                isLocked: true, // 預設鎖定，防止現場誤觸
+                sections: {},
+                cats: {}
+            };
+            SECTION_TEMPLATES.forEach(sec => {
+                tabData.sections[sec.id] = { title: sec.title, summary: "" };
+                for(let i=1; i<=sec.slots; i++) {
+                    let slotId = `${sec.id}_cat_${i}`;
+                    tabData.cats[slotId] = { checked: false, name: "", desc: "", img: "" };
+                }
+            });
+            return tabData;
+        }
+
+        // 渲染分頁列
+        function renderTabs() {
+            const bar = document.getElementById("tabs-bar");
+            bar.innerHTML = "";
+            
+            Object.keys(CRM_STORE.tabs).forEach(id => {
+                const t = CRM_STORE.tabs[id];
+                const tabEl = document.createElement("div");
+                tabEl.className = `tab ${id === CRM_STORE.activeTabId ? 'active' : ''}`;
+                tabEl.innerText = t.name;
+                tabEl.onclick = () => {
+                    CRM_STORE.activeTabId = id;
+                    saveDatabase();
+                    renderTabs();
+                    renderActiveContent();
+                };
+                bar.appendChild(tabEl);
+            });
+
+            // 新增案場按鈕
+            const addEl = document.createElement("div");
+            addEl.className = "tab-add";
+            addEl.innerText = "＋ 新增案場";
+            addEl.onclick = () => {
+                const name = prompt("請輸入新創到府案場名稱（例如：福吉小寶家）：");
+                if (name && name.trim() !== "") {
+                    const newId = "tab_" + Date.now();
+                    CRM_STORE.tabs[newId] = createBlankTabData(name.trim());
+                    CRM_STORE.activeTabId = newId;
+                    saveDatabase();
+                    renderTabs();
+                    renderActiveContent();
+                }
+            };
+            bar.appendChild(addEl);
+        }
+
+        // 渲染目前當前活化的家庭案場內容
+        function renderActiveContent() {
+            const activeId = CRM_STORE.activeTabId;
+            const content = document.getElementById("app-content");
+            content.innerHTML = "";
+
+            if (!activeId || !CRM_STORE.tabs[activeId]) {
+                document.getElementById("current-case-display").innerText = "目前無案場";
+                return;
+            }
+
+            const data = CRM_STORE.tabs[activeId];
+            document.getElementById("current-case-display").innerText = `案場：${data.name}`;
+            
+            // 更新鎖定按鈕外觀
+            const lockBtn = document.getElementById("lock-btn");
+            if (data.isLocked) {
+                lockBtn.innerText = "解鎖編輯檔案";
+                lockBtn.classList.add("is-locked");
+            } else {
+                lockBtn.innerText = "🔒 鎖定檔案防誤觸";
+                lockBtn.classList.remove("is-locked");
+            }
+
+            // 生成貨架
+            SECTION_TEMPLATES.forEach(sec => {
+                const secData = data.sections[sec.id];
+                let sectionHTML = `
+                    <div class="section-block ${data.isLocked ? 'is-locked-mode' : ''}" id="${sec.id}">
+                        <div class="section-header">
+                            <input type="text" class="section-title-input" id="title_${sec.id}" value="${secData.title}" ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'title', this.value)">
+                        </div>
+                        <div class="cat-list">
+                `;
+
+                for (let i = 1; i <= sec.slots; i++) {
+                    let slotId = `${sec.id}_cat_${i}`;
+                    const cat = data.cats[slotId];
+                    const isChecked = cat.checked;
+                    const hasImg = cat.img !== "";
+
+                    sectionHTML += `
+                        <div class="cat-card ${isChecked ? 'checked' : ''} ${cat.name.trim() === '' ? 'empty-target' : ''}" id="card_${slotId}">
+                            <div class="cat-row">
+                                <div class="cat-left">
+                                    <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
+                                    <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
+                                    
+                                    <div class="photo-box" onclick="triggerFileUpload('${slotId}')">
+                                        <img id="img_${slotId}" src="${cat.img}" style="display:${hasImg ? 'block' : 'none'};">
+                                        <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
+                                    </div>
+                                    <input type="file" class="file-input" id="file_${slotId}" accept="image/*" onchange="compressPhoto(event, '${slotId}')">
+                                </div>
+                                <div class="cat-right">
+                                    <input type="text" class="cat-name-input" id="name_${slotId}" value="${cat.name}" placeholder="輸入毛孩名字 (留空則不列印)" ${data.isLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
+                                    <textarea class="cat-desc-textarea" id="desc_${slotId}" placeholder="點擊呼叫鍵盤口述/打字注意事項..." ${data.isLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'desc', this.value)">${cat.desc}</textarea>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                sectionHTML += `
+                        </div>
+                        <div class="section-summary ${data.isLocked ? 'is-locked-mode' : ''}">
+                            <div class="summary-title">📌 區域重點備忘 / 禁忌小結</div>
+                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌或動線備忘..." ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary}</textarea>
+                        </div>
+                    </div>
+                `;
+                content.innerHTML += sectionHTML;
+            });
+        }
+
+        // 資料同步控制器
+        function updateTextData(secId, key, val) {
+            CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId][key] = val;
+            saveDatabase();
+        }
+
+        function updateCatData(slotId, key, val) {
+            const activeId = CRM_STORE.activeTabId;
+            CRM_STORE.tabs[activeId].cats[slotId][key] = val;
+            
+            // 即時同步列印過濾標籤
+            const card = document.getElementById(`card_${slotId}`);
+            if (key === 'name') {
+                if (val.trim() !== "") card.classList.remove("empty-target");
+                else card.classList.add("empty-target");
+            }
+            saveDatabase();
+        }
+
+        // 現場日常：只清空點名打勾，保留圖文檔案
+        function resetAttendanceOnly() {
+            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
+                const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
+                Object.keys(data.cats).forEach(slotId => {
+                    data.cats[slotId].checked = false;
+                });
+                saveDatabase();
+                renderActiveContent();
+            }
+        }
+
+        // 現場切換點名打勾防呆
+        function toggleAttendance(slotId) {
+            const chk = document.getElementById(`check_${slotId}`);
+            const card = document.getElementById(`card_${slotId}`);
+            const badge = document.getElementById(`badge_${slotId}`);
+            
+            CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].checked = chk.checked;
+            
+            if (chk.checked) {
+                card.classList.add("checked");
+                badge.className = "print-check-badge badge-yes";
+                badge.innerText = "✓ 當日已確認點名";
+            } else {
+                card.classList.remove("checked");
+                badge.className = "print-check-badge badge-no";
+                badge.innerText = "✕ 未見到未確認";
+            }
+            saveDatabase();
+        }
+
+        // 切換檔案編輯鎖定狀態
+        function toggleLockState() {
+            const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
+            data.isLocked = !data.isLocked;
+            saveDatabase();
+            renderActiveContent();
+        }
+
+        // 觸發上傳檔案
+        function triggerFileUpload(slotId) {
+            if (CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked) return; // 鎖定狀態下無法上傳修改照片
+            document.getElementById(`file_${slotId}`).click();
+        }
+
+        // 照片強效前端流式壓縮，防爆記憶體上限
+        function compressPhoto(event, slotId) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    const canvas = document.createElement('canvas');
+                    const MAX_BOUND = 300; // 高規縮圖尺寸
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_BOUND) { height *= MAX_BOUND / width; width = MAX_BOUND; }
+                    } else {
+                        if (height > MAX_BOUND) { width *= MAX_BOUND / height; height = MAX_BOUND; }
+                    }
+
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64Result = canvas.toDataURL('image/jpeg', 0.6); // 壓縮率0.6平衡畫質與極小體積
+                    
+                    document.getElementById(`img_${slotId}`).src = base64Result;
+                    document.getElementById(`img_${slotId}`).style.display = "block";
+                    document.getElementById(`ph_${slotId}`).style.display = "none";
+
+                    CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].img = base64Result;
+                    saveDatabase();
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 徹底卸載刪除特定家庭分頁
+        function deleteCurrentTab() {
+            const activeId = CRM_STORE.activeTabId;
+            const name = CRM_STORE.tabs[activeId].name;
+            if (confirm(`⚠️ 警告：確定要徹底刪除【${name}】的所有貓咪檔案與歷史紀錄嗎？`)) {
+                if (confirm(`🚨 再次確認：刪除後將完全無法復原，您確定要清空【${name}】嗎？`)) {
+                    delete CRM_STORE.tabs[activeId];
+                    const remainingKeys = Object.keys(CRM_STORE.tabs);
+                    if (remainingKeys.length > 0) {
+                        CRM_STORE.activeTabId = remainingKeys[0];
+                    } else {
+                        const defaultId = "tab_" + Date.now();
+                        CRM_STORE.activeTabId = defaultId;
+                        CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+                    }
+                    saveDatabase();
+                    renderTabs();
+                    renderActiveContent();
+                }
+            }
+        }
+
+        // 動態精準抓取時間與修改檔名
+        function triggerPrintPDF() {
+            const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
+            const now = new Date();
+            
+            // 格式化當前系統時間
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `${year}/${month}/${date} ${hours}:${minutes}`;
+            const fileDate = `${year}${month}${date}_${hours}${minutes}`;
+
+            // 置換 A4 列印頁首時間
+            document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
+            document.getElementById("print-main-title").innerText = `${data.name} // 到府點名服務日誌`;
+
+            // 戰略破局點：動態修改瀏覽器 Title，讓另存 PDF 的預設檔名直接完美格式化
+            const originalTitle = document.title;
+            document.title = `【到府日誌】_${data.name}_${fileDate}`;
+
+            // 呼叫系統列印
+            window.print();
+
+            // 列印完畢後切換回網頁版標題
+            setTimeout(() => {
+                document.title = originalTitle;
+            }, 1000);
+        }
+
+        window.onload = loadDatabase;
+    </script>
+</body>
+</html>
