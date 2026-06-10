@@ -30,10 +30,10 @@
             line-height: 1.5;
         }
 
-        /* 預設隱藏列印元件 */
+        /* 預設在一般網頁畫面上隱藏列印專用元件 */
         .print-header, .print-check-badge, .print-footer { display: none !important; }
 
-        /* 頂部導覽標籤 */
+        /* 頂部導覽與分頁標籤 */
         .tabs-container {
             display: flex;
             gap: 6px;
@@ -72,7 +72,7 @@
             white-space: nowrap;
         }
 
-        /* 控制台面版 */
+        /* 控制台 */
         .header-panel {
             background-color: #ffffff;
             border-radius: 0 0 16px 16px;
@@ -126,7 +126,7 @@
         .btn-rename { padding: 4px 8px; font-size: 12px; background-color: #eae5df; border: none; border-radius: 4px; cursor: pointer; color: #555555; }
         .btn-logout { background: none; border: none; font-size: 11px; color: #999999; text-decoration: underline; cursor: pointer; margin-left: 10px; }
 
-        /* 雲端狀態燈 */
+        /* 雲端安全動態狀態燈視覺 */
         .cloud-status-badge {
             display: inline-flex;
             align-items: center;
@@ -192,6 +192,7 @@
         }
         .cat-checkbox { width: 30px; height: 30px; cursor: pointer; accent-color: #4a9e67; }
         
+        /* 大頭貼容器 */
         .photo-box {
             width: 66px;
             height: 66px;
@@ -208,7 +209,7 @@
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
         
-        /* 三星 Chrome 相機鋼鐵防線 */
+        /* 三星 Chrome 相機終極破防線 */
         .native-file-overlay {
             position: absolute !important;
             top: 0 !important;
@@ -244,7 +245,9 @@
             background-color: #eae5df;
             cursor: not-allowed;
         }
-        .is-locked-mode .native-file-overlay { display: none !important; }
+        .is-locked-mode .native-file-overlay {
+            display: none !important;
+        }
 
         .section-summary { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #eae5df; }
         .summary-title { font-size: 12px; font-weight: bold; color: #b5945b; margin-bottom: 6px; }
@@ -255,7 +258,7 @@
 
         .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
 
-        /* 🔒 登入遮罩介面 */
+        /* 🔒 警衛室登入遮罩介面 */
         .auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #f6f5f2; z-index: 9999; display: flex;
@@ -313,7 +316,7 @@
                 background: transparent !important;
             }
 
-            /* 🌟 密令需求 2 完美實現：列印時將貨架重組為雙欄網格呈現，完美遏止文件拉長 */
+            /* 列印時將貨架重組為雙欄網格呈現，完美遏止文件拉長 */
             .cat-list {
                 display: flex !important;
                 flex-wrap: wrap !important;
@@ -392,13 +395,13 @@
                 opacity: 1 !important;
             }
             
-            /* 🌟 密令需求 1 完美實現：拔掉寬度上限，全面實施 nowrap 強制絕對不准換行 */
+            /* 恢復一行，全面實施 nowrap 強制絕對不准換行 */
             .footer-text-block { 
                 display: inline-block !important; 
                 vertical-align: middle !important; 
                 text-align: right !important; 
-                max-width: none !important; /* 解除寬度枷鎖 */
-                white-space: nowrap !important; /* 鋼鐵鞋帶：強制維持同一行，絕不斷行 */
+                max-width: none !important; 
+                white-space: nowrap !important; /* 強制維持同一行，絕不斷行 */
                 font-weight: bold !important; 
                 color: #50415a !important; 
                 font-size: 8.5pt !important; 
@@ -518,6 +521,7 @@
             }
         }
 
+        /* ⚔️ 核心微創手術：織入 Google Docs 級別本機快取防線，徹底免除鍵盤收回的邏輯死鎖 */
         function syncDatabaseWithCloud() {
             if (!CURRENT_USER_UID) return;
             activeListenerUnsubscribe = db.collection("users").doc(CURRENT_USER_UID)
@@ -530,7 +534,15 @@
 
                     if (doc.exists) { GLOBAL_STORE = doc.data(); }
                     else { forceResetToDefault(); }
-                    renderTabs(); renderActiveContent();
+
+                    // 🎯 核心攔截器：如果發現主人當前正把手指戳在輸入框裡編輯文字，只准更新記憶體，絕不准下令重刷 DOM 畫面！
+                    const isTyping = document.activeElement && 
+                                     (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
+                    
+                    if (!isTyping) {
+                        renderTabs(); 
+                        renderActiveContent(); 
+                    }
                 }, err => { console.error("同步錯誤:", err); });
         }
 
