@@ -208,7 +208,7 @@
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
         
-        /* 三星 Chrome 相機鋼鐵防線 - 全裸式 Input */
+        /* 三星 Chrome 相機鋼鐵防線 */
         .native-file-overlay {
             position: absolute !important;
             top: 0 !important;
@@ -279,13 +279,14 @@
         }
 
         /* --------------------------------------------------- */
-        /* 🌟 高端莫蘭迪調性 A4 PDF 列印美化規則 */
+        /* 高端莫蘭迪調性 A4 PDF 列印美化規則 */
         /* --------------------------------------------------- */
         @media print {
             @page { size: A4; margin: 18mm 14mm; }
             body { background-color: #ffffff !important; padding: 0; margin: 0; font-size: 11pt; color: #3A3530; }
             .tabs-container, .header-panel, .btn, .native-file-overlay, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay, .btn-logout { display: none !important; }
             
+            /* 高級品牌調性頁首 */
             .print-header {
                 display: block !important;
                 text-align: center;
@@ -312,6 +313,15 @@
                 background: transparent !important;
             }
 
+            /* 🌟 密令需求 2 完美實現：列印時將貨架重組為雙欄網格呈現，完美遏止文件拉長 */
+            .cat-list {
+                display: flex !important;
+                flex-wrap: wrap !important;
+                gap: 12px !important;
+                width: 100% !important;
+            }
+
+            /* 舉動卡片高級精緻化 ➜ 指定分配 50% 寬度減去間距 */
             .cat-card { 
                 page-break-inside: avoid !important; 
                 border: 1px solid #E4DFD9 !important;
@@ -319,6 +329,7 @@
                 margin-bottom: 12px !important; 
                 padding: 14px !important; 
                 border-radius: 8px !important;
+                width: calc(50% - 6px) !important; /* 精準截斷，雙欄對稱排列 */
             }
             .cat-card.checked { background-color: #F3F6F3 !important; border-color: #CADA9E !important; }
             .cat-card.empty-target { display: none !important; }
@@ -338,7 +349,7 @@
             .summary-title { font-family: "Noto Serif TC", serif !important; font-weight: bold !important; font-size: 10.5pt !important; color: #C5A880 !important; margin-bottom: 4px !important; }
             .summary-textarea { border: none !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; color: #4A4540 !important; background: transparent !important; line-height: 1.5 !important; }
             
-            /* 🌟 核心增幅：高奢散文詩風格頁尾排版 */
+            /* 高奢散文詩風格頁尾排版 */
             .print-footer { 
                 display: block !important; 
                 visibility: visible !important;
@@ -380,7 +391,18 @@
                 visibility: visible !important;
                 opacity: 1 !important;
             }
-            .footer-text-block { display: inline-block !important; vertical-align: middle !important; text-align: right !important; max-width: 220px !important; font-weight: bold !important; color: #50415a !important; font-size: 8.5pt !important; }
+            
+            /* 🌟 密令需求 1 完美實現：拔掉寬度上限，全面實施 nowrap 強制絕對不准換行 */
+            .footer-text-block { 
+                display: inline-block !important; 
+                vertical-align: middle !important; 
+                text-align: right !important; 
+                max-width: none !important; /* 解除寬度枷鎖 */
+                white-space: nowrap !important; /* 鋼鐵鞋帶：強制維持同一行，絕不斷行 */
+                font-weight: bold !important; 
+                color: #50415a !important; 
+                font-size: 8.5pt !important; 
+            }
         }
     </style>
 </head>
