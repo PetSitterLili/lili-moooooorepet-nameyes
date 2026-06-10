@@ -610,7 +610,7 @@
                                         <img id="img_${slotId}" src="${catImg}" style="display:${hasImg ? 'block' : 'none'};">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
                                         
-                                        <input type="file" class="native-file-overlay" id="file_${slotId}" accept="image/*" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
+                                        <input type="file" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
                                     </div>
                                 </div>
                                 <div class="cat-right">
