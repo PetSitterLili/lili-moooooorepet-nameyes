@@ -28,6 +28,7 @@
             overflow-x: auto;
             padding-bottom: 8px;
             margin-bottom: 12px;
+            min-height: 40px;
         }
         .tab {
             padding: 10px 16px;
@@ -104,6 +105,8 @@
         .btn-lock.is-locked { background-color: #6c757d; }
         .btn-print { background-color: #50415a; color: white; }
         .btn-delete { background-color: #c94a4a; color: white; max-width: 90px; font-size: 12px; }
+        
+        .emergency-link { font-size: 11px; color: #b5945b; text-decoration: underline; cursor: pointer; background: none; border: none; padding: 0; }
 
         /* 區域區塊 */
         .section-block {
@@ -209,7 +212,7 @@
         @media print {
             @page { size: A4; margin: 15mm 12mm; }
             body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; }
-            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote { display: none !important; }
+            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote, .emergency-link { display: none !important; }
             
             .print-header {
                 display: block !important;
@@ -260,7 +263,8 @@
 
     <div class="header-panel" id="control-panel">
         <div class="case-title-row">
-            <div class="case-name-display" id="current-case-display">目前無案場</div>
+            <div class="case-name-display" id="current-case-display">初始化中...</div>
+            <button class="emergency-link" onclick="emergencyForceReset()">[ 應急修復重置 ]</button>
             <button class="btn btn-delete" onclick="deleteCurrentTab()">刪除此案場</button>
         </div>
         <div class="control-buttons">
@@ -302,33 +306,66 @@
             tabs: {}
         };
 
-        /* V2.1 戰略優化：加入絕對防炸 Try-Catch 機制，確保舊資料損壞時網頁依然能正常初始化渲染 */
+        /* ⚔️ V3.0 鋼鐵特赦重載核心：包裹一切潛在物件錯誤，保證不中斷 */
         function loadDatabase() {
             try {
+                localStorage.removeItem("aris_sitter_19cats_data");
                 const dataStr = localStorage.getItem(STORAGE_KEY);
                 if (dataStr) {
                     CRM_STORE = JSON.parse(dataStr);
                 }
-                // 強效結構安全閥：如果讀取出的資料不符合分頁規格，強制啟動重置，防止網頁卡死
-                if (!CRM_STORE || !CRM_STORE.tabs || typeof CRM_STORE.tabs !== 'object') {
-                    throw new Error("Data structure invalid");
-                }
             } catch (e) {
-                // 發生任何錯誤，直接初始化最乾淨、正確的空白數據架構
-                const defaultId = "tab_" + Date.now();
-                CRM_STORE = {
-                    activeTabId: defaultId,
-                    tabs: {}
-                };
-                CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
-                saveDatabase();
+                CRM_STORE = null;
             }
+
+            // 安全性全面重組
+            if (!CRM_STORE || typeof CRM_STORE !== 'object' || !CRM_STORE.tabs) {
+                forceResetToDefault();
+                return;
+            }
+
+            let isCorrupted = false;
+            try {
+                Object.keys(CRM_STORE.tabs).forEach(id => {
+                    const tab = CRM_STORE.tabs[id];
+                    if (!tab || !tab.name || !tab.cats || !tab.sections) {
+                        isCorrupted = true;
+                    }
+                });
+            } catch(err) {
+                isCorrupted = true;
+            }
+
+            if (isCorrupted || Object.keys(CRM_STORE.tabs).length === 0) {
+                forceResetToDefault();
+                return;
+            }
+
+            if (!CRM_STORE.activeTabId || !CRM_STORE.tabs[CRM_STORE.activeTabId]) {
+                CRM_STORE.activeTabId = Object.keys(CRM_STORE.tabs)[0];
+            }
+
+            saveDatabase();
+            renderTabs();
+            renderActiveContent();
+        }
+
+        function forceResetToDefault() {
+            const defaultId = "tab_" + Date.now();
+            CRM_STORE = {
+                activeTabId: defaultId,
+                tabs: {}
+            };
+            CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+            saveDatabase();
             renderTabs();
             renderActiveContent();
         }
 
         function saveDatabase() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(CRM_STORE));
+            try {
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(CRM_STORE));
+            } catch (e) {}
         }
 
         function createBlankTabData(name) {
@@ -350,21 +387,25 @@
 
         function renderTabs() {
             const bar = document.getElementById("tabs-bar");
+            if (!bar) return;
             bar.innerHTML = "";
             
-            Object.keys(CRM_STORE.tabs).forEach(id => {
-                const t = CRM_STORE.tabs[id];
-                const tabEl = document.createElement("div");
-                tabEl.className = `tab ${id === CRM_STORE.activeTabId ? 'active' : ''}`;
-                tabEl.innerText = t.name;
-                tabEl.onclick = () => {
-                    CRM_STORE.activeTabId = id;
-                    saveDatabase();
-                    renderTabs();
-                    renderActiveContent();
-                };
-                bar.appendChild(tabEl);
-            });
+            try {
+                Object.keys(CRM_STORE.tabs).forEach(id => {
+                    const t = CRM_STORE.tabs[id];
+                    if (!t || !t.name) return; 
+                    const tabEl = document.createElement("div");
+                    tabEl.className = `tab ${id === CRM_STORE.activeTabId ? 'active' : ''}`;
+                    tabEl.innerText = t.name;
+                    tabEl.onclick = () => {
+                        CRM_STORE.activeTabId = id;
+                        saveDatabase();
+                        renderTabs();
+                        renderActiveContent();
+                    };
+                    bar.appendChild(tabEl);
+                });
+            } catch(e){}
 
             const addEl = document.createElement("div");
             addEl.className = "tab-add";
@@ -383,60 +424,73 @@
             bar.appendChild(addEl);
         }
 
+        /* ⚔️ V3.0 極致防禦性渲染：採用全空值補償，哪怕資料毀損也絕對能流暢顯示卡片 */
         function renderActiveContent() {
             const activeId = CRM_STORE.activeTabId;
             const content = document.getElementById("app-content");
+            if (!content) return;
             content.innerHTML = "";
 
-            if (!activeId || !CRM_STORE.tabs[activeId]) {
-                document.getElementById("current-case-display").innerText = "目前無案場";
+            const titleDisplay = document.getElementById("current-case-display");
+            if (!activeId || !CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) {
+                if (titleDisplay) titleDisplay.innerText = "目前無案場";
                 return;
             }
 
             const data = CRM_STORE.tabs[activeId];
-            document.getElementById("current-case-display").innerText = `案場：${data.name}`;
+            const isTabLocked = data.isLocked !== false; 
+            if (titleDisplay) titleDisplay.innerText = `案場：${data.name || "未命名"}`;
             
             const lockBtn = document.getElementById("lock-btn");
-            if (data.isLocked) {
-                lockBtn.innerText = "解鎖編輯檔案";
-                lockBtn.classList.add("is-locked");
-            } else {
-                lockBtn.innerText = "🔒 鎖定檔案防誤觸";
-                lockBtn.classList.remove("is-locked");
+            if (lockBtn) {
+                if (isTabLocked) {
+                    lockBtn.innerText = "解鎖編輯檔案";
+                    lockBtn.classList.add("is-locked");
+                } else {
+                    lockBtn.innerText = "🔒 鎖定檔案防誤觸";
+                    lockBtn.classList.remove("is-locked");
+                }
             }
 
             SECTION_TEMPLATES.forEach(sec => {
-                const secData = data.sections[sec.id];
+                const sectionsContainer = data.sections || {};
+                const secData = sectionsContainer[sec.id] || { title: sec.title, summary: "" };
+                
                 let sectionHTML = `
-                    <div class="section-block ${data.isLocked ? 'is-locked-mode' : ''}" id="${sec.id}">
+                    <div class="section-block ${isTabLocked ? 'is-locked-mode' : ''}" id="${sec.id}">
                         <div class="section-header">
-                            <input type="text" class="section-title-input" id="title_${sec.id}" value="${secData.title}" ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'title', this.value)">
+                            <input type="text" class="section-title-input" id="title_${sec.id}" value="${secData.title || sec.title}" ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'title', this.value)">
                         </div>
                         <div class="cat-list">
                 `;
 
                 for (let i = 1; i <= sec.slots; i++) {
                     let slotId = `${sec.id}_cat_${i}`;
-                    const cat = data.cats[slotId];
-                    const isChecked = cat.checked;
-                    const hasImg = cat.img !== "";
+                    const catsContainer = data.cats || {};
+                    const cat = catsContainer[slotId] || { checked: false, name: "", desc: "", img: "" };
+                    
+                    const isChecked = cat.checked === true;
+                    const catName = cat.name || "";
+                    const catDesc = cat.desc || "";
+                    const catImg = cat.img || "";
+                    const hasImg = catImg !== "";
 
                     sectionHTML += `
-                        <div class="cat-card ${isChecked ? 'checked' : ''} ${cat.name.trim() === '' ? 'empty-target' : ''}" id="card_${slotId}">
+                        <div class="cat-card ${isChecked ? 'checked' : ''} ${catName.trim() === '' ? 'empty-target' : ''}" id="card_${slotId}">
                             <div class="cat-row">
                                 <div class="cat-left">
                                     <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
                                     <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
                                     
                                     <div class="photo-box" onclick="triggerFileUpload('${slotId}')">
-                                        <img id="img_${slotId}" src="${cat.img}" style="display:${hasImg ? 'block' : 'none'};">
+                                        <img id="img_${slotId}" src="${catImg}" style="display:${hasImg ? 'block' : 'none'};">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
                                     </div>
                                     <input type="file" class="file-input" id="file_${slotId}" accept="image/*" onchange="compressPhoto(event, '${slotId}')">
                                 </div>
                                 <div class="cat-right">
-                                    <input type="text" class="cat-name-input" id="name_${slotId}" value="${cat.name}" placeholder="輸入毛孩名字 (留空則不列印)" ${data.isLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
-                                    <textarea class="cat-desc-textarea" id="desc_${slotId}" placeholder="點擊呼叫鍵盤口述/打字注意事項..." ${data.isLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'desc', this.value)">${cat.desc}</textarea>
+                                    <input type="text" class="cat-name-input" id="name_${slotId}" value="${catName}" placeholder="輸入毛孩名字 (留空則不列印)" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
+                                    <textarea class="cat-desc-textarea" id="desc_${slotId}" placeholder="點擊呼叫鍵盤口述/打字注意事項..." ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'desc', this.value)">${catDesc}</textarea>
                                 </div>
                             </div>
                         </div>
@@ -445,9 +499,9 @@
 
                 sectionHTML += `
                         </div>
-                        <div class="section-summary ${data.isLocked ? 'is-locked-mode' : ''}">
+                        <div class="section-summary ${isTabLocked ? 'is-locked-mode' : ''}">
                             <div class="summary-title">📌 區域重點備忘 / 禁忌小結</div>
-                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌 or 動線備忘..." ${data.isLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary}</textarea>
+                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌 or 動線備忘..." ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary || ""}</textarea>
                         </div>
                     </div>
                 `;
@@ -456,16 +510,24 @@
         }
 
         function updateTextData(secId, key, val) {
-            CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId][key] = val;
-            saveDatabase();
+            if (CRM_STORE.tabs && CRM_STORE.tabs[CRM_STORE.activeTabId]) {
+                if (!CRM_STORE.tabs[CRM_STORE.activeTabId].sections) CRM_STORE.tabs[CRM_STORE.activeTabId].sections = {};
+                if (!CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId]) CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId] = {};
+                CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId][key] = val;
+                saveDatabase();
+            }
         }
 
         function updateCatData(slotId, key, val) {
             const activeId = CRM_STORE.activeTabId;
+            if (!CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) return;
+            if (!CRM_STORE.tabs[activeId].cats) CRM_STORE.tabs[activeId].cats = {};
+            if (!CRM_STORE.tabs[activeId].cats[slotId]) CRM_STORE.tabs[activeId].cats[slotId] = {};
+            
             CRM_STORE.tabs[activeId].cats[slotId][key] = val;
             
             const card = document.getElementById(`card_${slotId}`);
-            if (key === 'name') {
+            if (card && key === 'name') {
                 if (val.trim() !== "") card.classList.remove("empty-target");
                 else card.classList.add("empty-target");
             }
@@ -475,11 +537,13 @@
         function resetAttendanceOnly() {
             if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
                 const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
-                Object.keys(data.cats).forEach(slotId => {
-                    data.cats[slotId].checked = false;
-                });
-                saveDatabase();
-                renderActiveContent();
+                if (data && data.cats) {
+                    Object.keys(data.cats).forEach(slotId => {
+                        if (data.cats[slotId]) data.cats[slotId].checked = false;
+                    });
+                    saveDatabase();
+                    renderActiveContent();
+                }
             }
         }
 
@@ -488,30 +552,39 @@
             const card = document.getElementById(`card_${slotId}`);
             const badge = document.getElementById(`badge_${slotId}`);
             
+            if (!chk || !CRM_STORE.tabs || !CRM_STORE.tabs[CRM_STORE.activeTabId]) return;
+            if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats) CRM_STORE.tabs[CRM_STORE.activeTabId].cats = {};
+            if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId]) CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId] = {};
+            
             CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].checked = chk.checked;
             
-            if (chk.checked) {
-                card.classList.add("checked");
-                badge.className = "print-check-badge badge-yes";
-                badge.innerText = "✓ 當日已確認點名";
-            } else {
-                card.classList.remove("checked");
-                badge.className = "print-check-badge badge-no";
-                badge.innerText = "✕ 未見到未確認";
+            if (card && badge) {
+                if (chk.checked) {
+                    card.classList.add("checked");
+                    badge.className = "print-check-badge badge-yes";
+                    badge.innerText = "✓ 當日已確認點名";
+                } else {
+                    card.classList.remove("checked");
+                    badge.className = "print-check-badge badge-no";
+                    badge.innerText = "✕ 未見到未確認";
+                }
             }
             saveDatabase();
         }
 
         function toggleLockState() {
-            const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
-            data.isLocked = !data.isLocked;
-            saveDatabase();
-            renderActiveContent();
+            const data = CRM_STORE.tabs ? CRM_STORE.tabs[CRM_STORE.activeTabId] : null;
+            if (data) {
+                data.isLocked = data.isLocked === false;
+                saveDatabase();
+                renderActiveContent();
+            }
         }
 
         function triggerFileUpload(slotId) {
-            if (CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked) return; 
-            document.getElementById(`file_${slotId}`).click();
+            if (!CRM_STORE.tabs || !CRM_STORE.tabs[CRM_STORE.activeTabId] || CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked !== false) return; 
+            const f = document.getElementById(`file_${slotId}`);
+            if (f) f.click();
         }
 
         function compressPhoto(event, slotId) {
@@ -539,12 +612,20 @@
 
                     const base64Result = canvas.toDataURL('image/jpeg', 0.6); 
                     
-                    document.getElementById(`img_${slotId}`).src = base64Result;
-                    document.getElementById(`img_${slotId}`).style.display = "block";
-                    document.getElementById(`ph_${slotId}`).style.display = "none";
+                    const imgEl = document.getElementById(`img_${slotId}`);
+                    const phEl = document.getElementById(`ph_${slotId}`);
+                    if (imgEl && phEl) {
+                        imgEl.src = base64Result;
+                        imgEl.style.display = "block";
+                        phEl.style.display = "none";
+                    }
 
-                    CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].img = base64Result;
-                    saveDatabase();
+                    if (CRM_STORE.tabs && CRM_STORE.tabs[CRM_STORE.activeTabId]) {
+                        if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats) CRM_STORE.tabs[CRM_STORE.activeTabId].cats = {};
+                        if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId]) CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId] = {};
+                        CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].img = base64Result;
+                        saveDatabase();
+                    }
                 };
                 img.src = e.target.result;
             };
@@ -553,7 +634,8 @@
 
         function deleteCurrentTab() {
             const activeId = CRM_STORE.activeTabId;
-            const name = CRM_STORE.tabs[activeId].name;
+            if (!activeId || !CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) return;
+            const name = CRM_STORE.tabs[activeId].name || "未命名";
             if (confirm(`⚠️ 警告：確定要徹底刪除【${name}】的所有貓咪檔案與歷史紀錄嗎？`)) {
                 if (confirm(`🚨 再次確認：刪除後將完全無法復原，您確定要清空【${name}】嗎？`)) {
                     delete CRM_STORE.tabs[activeId];
@@ -561,9 +643,8 @@
                     if (remainingKeys.length > 0) {
                         CRM_STORE.activeTabId = remainingKeys[0];
                     } else {
-                        const defaultId = "tab_" + Date.now();
-                        CRM_STORE.activeTabId = defaultId;
-                        CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+                        forceResetToDefault();
+                        return;
                     }
                     saveDatabase();
                     renderTabs();
@@ -572,8 +653,18 @@
             }
         }
 
+        function emergencyForceReset() {
+            if (confirm("🚨 這是系統應急完全重置，會強力淨化並清空目前卡死的舊快取。確定要執行嗎？")) {
+                try {
+                    localStorage.clear();
+                } catch(e){}
+                location.reload();
+            }
+        }
+
         function triggerPrintPDF() {
-            const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
+            const data = CRM_STORE.tabs ? CRM_STORE.tabs[CRM_STORE.activeTabId] : null;
+            if (!data) return;
             const now = new Date();
             
             const year = now.getFullYear();
@@ -584,11 +675,13 @@
             const timeString = `${year}/${month}/${date} ${hours}:${minutes}`;
             const fileDate = `${year}${month}${date}_${hours}${minutes}`;
 
-            document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
-            document.getElementById("print-main-title").innerText = `嘉義寵物保姆ㄌㄌ // ${data.name}名冊`;
+            const subTitle = document.getElementById("print-sub-title");
+            const mainTitle = document.getElementById("print-main-title");
+            if (subTitle) subTitle.innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
+            if (mainTitle) mainTitle.innerText = `嘉義寵物保姆ㄌㄌ // ${(data.name || "未命名")}名冊`;
 
             const originalTitle = document.title;
-            document.title = `【到府日誌】_${data.name}_${fileDate}`;
+            document.title = `【到府日誌】_${(data.name || "未命名")}_${fileDate}`;
 
             window.print();
 
@@ -597,7 +690,8 @@
             }, 1000);
         }
 
-        window.onload = loadDatabase;
+        /* ⚔️ V3.0 破局大絕招：繞過 window.onload 阻斷，網頁載入當下立馬自我強制執行！ */
+        loadDatabase();
     </script>
 </body>
 </html>
