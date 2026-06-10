@@ -9,10 +9,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     
+    <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="cat_striped.png">
     <link rel="icon" type="image/png" href="cat_striped.png">
     
-    <title>多案場毛孩 CRM 點名工作台</title>
+    <title>ㄌㄌ多寵點名板</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
@@ -117,7 +118,6 @@
         .btn-lock { background-color: #b5945b; color: white; }
         .btn-lock.is-locked { background-color: #6c757d; }
         .btn-print { background-color: #50415a; color: white; }
-        /* 刪除案場按鈕回歸 */
         .btn-delete { background-color: #c94a4a; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; border: none; font-weight: bold; cursor: pointer; }
         
         .btn-rename { padding: 4px 8px; font-size: 12px; background-color: #eae5df; border: none; border-radius: 4px; cursor: pointer; color: #555555; }
@@ -205,10 +205,10 @@
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
         
-        /* ⚔️ 三星/Android Chrome 相機完美突破防線：將原生上傳控制項以透明狀態絕對定位於大頭貼最上層，手指直接戳擊觸發相機 */
+        /* 鋼鐵透明防線：直接浮動於 📷 上方，手指直接戳擊 input 原生元件，解鎖三星 Chrome 原生相機＋相簿權限 */
         .native-file-overlay {
             position: absolute;
-            top: 40px; /* 精準疊加在 photo-box 的座標上 */
+            top: 40px;
             left: 2px;
             width: 66px;
             height: 66px;
@@ -290,7 +290,7 @@
                 padding-bottom: 12px;
                 margin-bottom: 20px;
             }
-            /* 需求 5 & 6：大標題精準改為粗黑體（字重 900 黑色） */
+            /* 大標題精準粗黑體 */
             .print-header h1 { 
                 font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif !important; 
                 color: #000000 !important; 
@@ -302,7 +302,7 @@
 
             .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 24px !important; page-break-inside: avoid; }
             .section-header { border-bottom: 1.5px solid #000000 !important; margin-bottom: 12px !important; }
-            /* 需求 5：中標題使用印刷宋體 (一般字重) */
+            /* 中標題使用印刷宋體 (一般字重) */
             .section-title-input { 
                 font-family: "Noto Serif TC", "思源宋體", "New MingLiu", serif !important;
                 font-size: 13pt !important; 
@@ -315,7 +315,6 @@
             .cat-card { page-break-inside: avoid; border: 1px solid #eae5df !important; background-color: #ffffff !important; margin-bottom: 10px !important; padding: 10px !important; }
             .cat-card.empty-target { display: none !important; }
 
-            /* 內文維持乾淨俐落黑體 */
             .cat-name-input { border: none !important; padding: 0 !important; font-size: 12pt !important; font-weight: bold !important; background: transparent !important;}
             .cat-desc-textarea { border: none !important; padding: 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important;}
 
@@ -335,7 +334,7 @@
             }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
             
-            /* 需求 4：頁尾文字強制橫向不斷行呈現，並嵌入高規格 IG 超連結 */
+            /* 頁尾文字橫向不斷行，內嵌高規格 IG 超連結 */
             .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; background: #ffffff; }
             .print-footer-table { display: table; width: 100%; border-top: 1px solid #eae5df; padding-top: 10px; }
             .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; white-space: nowrap; }
@@ -405,7 +404,6 @@
     </div>
 
     <script>
-        // 串接妳剛申請出爐的 2026 雲端黃金密鑰
         const firebaseConfig = {
             apiKey: "AIzaSyDP85XIQeEtd5r6tAetc74-PEHO8Ixfj6U",
             authDomain: "lili-pet-crm.firebaseapp.com",
@@ -818,7 +816,6 @@
             const mainTitle = document.getElementById("print-main-title");
             if (subTitle) subTitle.innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
             
-            // 需求 6：列印抬頭格式完美遵循
             if (mainTitle) mainTitle.innerText = `嘉義寵物保姆ㄌㄌ // ${(data.name || "未命名")}點名冊`;
 
             const originalTitle = document.title;
