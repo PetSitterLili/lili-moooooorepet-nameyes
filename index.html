@@ -30,6 +30,9 @@
             line-height: 1.5;
         }
 
+        /* 預設在一般網頁畫面上隱藏列印專用元件 */
+        .print-header, .print-check-badge, .print-footer { display: none !important; }
+
         /* 頂部導覽與分頁標籤 */
         .tabs-container {
             display: flex;
@@ -189,7 +192,7 @@
         }
         .cat-checkbox { width: 30px; height: 30px; cursor: pointer; accent-color: #4a9e67; }
         
-        /* 📷 大頭貼容器完美鎖定相對定位 */
+        /* 大頭貼容器 */
         .photo-box {
             width: 66px;
             height: 66px;
@@ -206,7 +209,7 @@
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
         
-        /* ⚔️ 三星 Chrome 相機終極破防線 */
+        /* 三星 Chrome 相機終極破防線 */
         .native-file-overlay {
             position: absolute !important;
             top: 0 !important;
@@ -278,7 +281,9 @@
             border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer;
         }
 
+        /* --------------------------------------------------- */
         /* 列印美化規則 (A4 PDF) */
+        /* --------------------------------------------------- */
         @media print {
             @page { size: A4; margin: 15mm 12mm; }
             body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; }
@@ -333,14 +338,37 @@
             }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
             
-            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; background: #ffffff; left: 0; right: 0; }
-            .print-footer-flex { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #eae5df; padding-top: 10px; width: 100%; }
-            .print-footer-left { font-size: 9.5pt !important; color: #555555 !important; font-style: italic; white-space: nowrap; text-align: left; }
-            .print-footer-right { font-size: 8.5pt !important; color: #666666 !important; line-height: 1.3; white-space: nowrap; text-align: right; }
-            .print-qrcode { width: 50px; height: 50px; margin-top: 4px; border: 1px solid #eae5df; padding: 2px; background: #ffffff; display: inline-block; vertical-align: middle; margin-left: 6px; }
-            .footer-text-block { display: inline-block; vertical-align: middle; text-align: right; }
+            /* 修正處：將固定定位改為結尾自然流動排列，強制覆蓋隱藏，並強制色彩輸出 */
+            .print-footer { 
+                display: block !important; 
+                position: relative !important; 
+                margin-top: 40px !important; 
+                width: 100% !important; 
+                background: #ffffff !important; 
+                page-break-inside: avoid !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            .print-footer-flex { display: flex; justify-content: space-between; align-items: flex-end; border-top: 1px solid #eae5df; padding-top: 12px; width: 100%; }
+            .print-footer-left { font-size: 9.5pt !important; color: #555555 !important; font-style: italic; text-align: left; max-width: 60%; line-height: 1.4; }
+            .print-footer-right { font-size: 8.5pt !important; color: #666666 !important; line-height: 1.4; text-align: right; }
+            
+            /* 強制讓 QR Code 圖片在列印時顯現 */
+            .print-qrcode { 
+                width: 60px !important; 
+                height: 60px !important; 
+                margin-top: 4px; 
+                border: 1px solid #eae5df; 
+                padding: 2px; 
+                background: #ffffff; 
+                display: inline-block !important; 
+                vertical-align: middle; 
+                margin-left: 8px; 
+                visibility: visible !important;
+                opacity: 1 !important;
+            }
+            .footer-text-block { display: inline-block; vertical-align: middle; text-align: right; max-width: 200px; font-weight: bold; }
         }
-        .print-header, .print-check-badge, .print-footer { display: none; }
     </style>
 </head>
 <body>
@@ -609,7 +637,6 @@
                                     <div class="photo-box">
                                         <img id="img_${slotId}" src="${catImg}" style="display:${hasImg ? 'block' : 'none'};">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
-                                        
                                         <input type="file" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
                                     </div>
                                 </div>
