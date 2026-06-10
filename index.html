@@ -9,6 +9,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="mobile-web-app-capable" content="yes">
     
+    <link rel="apple-touch-icon" href="cat_striped.png">
+    <link rel="icon" type="image/png" href="cat_striped.png">
+    
     <title>多案場毛孩 CRM 點名工作台</title>
     
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -82,6 +85,8 @@
             margin-bottom: 16px;
             border-bottom: 1px solid #f0ede9;
             padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
         }
         .case-name-display {
             font-size: 18px;
@@ -112,12 +117,13 @@
         .btn-lock { background-color: #b5945b; color: white; }
         .btn-lock.is-locked { background-color: #6c757d; }
         .btn-print { background-color: #50415a; color: white; }
-        .btn-delete { background-color: #c94a4a; color: white; max-width: 90px; font-size: 12px; }
+        /* 刪除案場按鈕回歸 */
+        .btn-delete { background-color: #c94a4a; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; border: none; font-weight: bold; cursor: pointer; }
         
         .btn-rename { padding: 4px 8px; font-size: 12px; background-color: #eae5df; border: none; border-radius: 4px; cursor: pointer; color: #555555; }
         .btn-logout { background: none; border: none; font-size: 11px; color: #999999; text-decoration: underline; cursor: pointer; margin-left: 10px; }
 
-        /* 🌟 雲端安全動態狀態燈視覺 */
+        /* 雲端安全動態狀態燈視覺 */
         .cloud-status-badge {
             display: inline-flex;
             align-items: center;
@@ -179,6 +185,7 @@
             align-items: center;
             gap: 10px;
             min-width: 70px;
+            position: relative;
         }
         .cat-checkbox { width: 30px; height: 30px; cursor: pointer; accent-color: #4a9e67; }
         
@@ -198,8 +205,17 @@
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
         .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
         
-        /* 鋼鐵修正：純淨無死角的檔案 input 樣式，點擊時完美觸發手機系統原生拍照選單 */
-        .file-input { display: none !important; }
+        /* ⚔️ 三星/Android Chrome 相機完美突破防線：將原生上傳控制項以透明狀態絕對定位於大頭貼最上層，手指直接戳擊觸發相機 */
+        .native-file-overlay {
+            position: absolute;
+            top: 40px; /* 精準疊加在 photo-box 的座標上 */
+            left: 2px;
+            width: 66px;
+            height: 66px;
+            opacity: 0 !important;
+            z-index: 99;
+            cursor: pointer;
+        }
 
         .cat-right { flex: 1; display: flex; flex-direction: column; gap: 8px; }
         .cat-name-input {
@@ -223,6 +239,9 @@
             background-color: #eae5df;
             cursor: not-allowed;
         }
+        .is-locked-mode .native-file-overlay {
+            display: none !important;
+        }
 
         .section-summary { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #eae5df; }
         .summary-title { font-size: 12px; font-weight: bold; color: #b5945b; margin-bottom: 6px; }
@@ -233,7 +252,7 @@
 
         .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
 
-        /* 🔒 尊寵超級密碼警衛室登入遮罩 */
+        /* 🔒 警衛室登入遮罩介面 */
         .auth-overlay {
             position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background-color: #f6f5f2; z-index: 9999; display: flex;
@@ -262,41 +281,41 @@
         @media print {
             @page { size: A4; margin: 15mm 12mm; }
             body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; }
-            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay { display: none !important; }
+            .tabs-container, .header-panel, .btn, .native-file-overlay, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay, .btn-logout { display: none !important; }
             
             .print-header {
                 display: block !important;
                 text-align: center;
-                border-bottom: 1px solid #50415a;
+                border-bottom: 2px solid #000000;
                 padding-bottom: 12px;
                 margin-bottom: 20px;
             }
-            /* 需求 5 & 6：大標題指定換成優雅「粉圓體」 */
+            /* 需求 5 & 6：大標題精準改為粗黑體（字重 900 黑色） */
             .print-header h1 { 
-                font-family: "jf-openhuninn", "粉圓體", "Noto Sans TC", sans-serif !important; 
-                color: #50415a; 
-                font-size: 18pt; 
+                font-family: -apple-system, BlinkMacSystemFont, "Noto Sans TC", sans-serif !important; 
+                color: #000000 !important; 
+                font-size: 20pt !important; 
                 margin: 0 0 4px 0; 
-                font-weight: normal;
+                font-weight: 900 !important; 
             }
-            .print-header p { color: #b5945b; font-size: 9pt; margin: 0; font-style: italic; }
+            .print-header p { color: #555555; font-size: 9.5pt; margin: 0; font-style: italic; }
 
             .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 24px !important; page-break-inside: avoid; }
-            .section-header { border-bottom: 2px solid #50415a !important; margin-bottom: 12px !important; }
-            /* 需求 5：中標題使用精美「印刷宋體」 */
+            .section-header { border-bottom: 1.5px solid #000000 !important; margin-bottom: 12px !important; }
+            /* 需求 5：中標題使用印刷宋體 (一般字重) */
             .section-title-input { 
                 font-family: "Noto Serif TC", "思源宋體", "New MingLiu", serif !important;
                 font-size: 13pt !important; 
                 border: none !important; 
                 font-weight: normal !important; 
-                color: #50415a !important; 
+                color: #000000 !important; 
                 background: transparent !important;
             }
 
             .cat-card { page-break-inside: avoid; border: 1px solid #eae5df !important; background-color: #ffffff !important; margin-bottom: 10px !important; padding: 10px !important; }
             .cat-card.empty-target { display: none !important; }
 
-            /* 內文維持原本乾淨俐落的黑體 */
+            /* 內文維持乾淨俐落黑體 */
             .cat-name-input { border: none !important; padding: 0 !important; font-size: 12pt !important; font-weight: bold !important; background: transparent !important;}
             .cat-desc-textarea { border: none !important; padding: 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important;}
 
@@ -312,11 +331,12 @@
                 font-family: "Noto Serif TC", "思源宋體", serif !important;
                 font-weight: normal !important;
                 font-size: 10.5pt !important;
+                color: #000000 !important;
             }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
             
-            /* 需求 4：頁尾文字強制橫向不換行呈現象 */
-            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; }
+            /* 需求 4：頁尾文字強制橫向不斷行呈現，並嵌入高規格 IG 超連結 */
+            .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; background: #ffffff; }
             .print-footer-table { display: table; width: 100%; border-top: 1px solid #eae5df; padding-top: 10px; }
             .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; white-space: nowrap; }
             .print-footer-right { display: table-cell; vertical-align: bottom; text-align: right; font-size: 8.5pt !important; color: #666666 !important; line-height: 1.3; white-space: nowrap; }
@@ -356,6 +376,7 @@
             <div class="cloud-status-badge">
                 <span class="status-dot green" id="status-light"></span>
                 <span id="status-text">雲端已安全鎖定</span>
+                <button class="btn-delete" onclick="deleteCurrentTab()">刪除此案場</button>
             </div>
         </div>
         <div class="control-buttons">
@@ -375,7 +396,7 @@
                 「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」
             </div>
             <div class="print-footer-right">
-                <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank" style="text-decoration: none; color: inherit;">
+                <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank" style="text-decoration: none; color: inherit; display: block;">
                     <div class="footer-text-block">歡迎追蹤 ㄌㄌ，因為你家小寶貝有可能上鏡頭喔！</div>
                     <img class="print-qrcode" src="IGQRCODE.png" onerror="this.src='IGQRCODE.jpg'" alt="IG QRCODE">
                 </a>
@@ -384,7 +405,7 @@
     </div>
 
     <script>
-        // 🌟 串接妳剛申請出爐的 2026 雲端黃金密鑰
+        // 串接妳剛申請出爐的 2026 雲端黃金密鑰
         const firebaseConfig = {
             apiKey: "AIzaSyDP85XIQeEtd5r6tAetc74-PEHO8Ixfj6U",
             authDomain: "lili-pet-crm.firebaseapp.com",
@@ -395,14 +416,12 @@
             measurementId: "G-171MZGW855"
         };
 
-        // 初始化 Google 頂級大腦
         firebase.initializeApp(firebaseConfig);
         const db = firebase.firestore();
         const auth = firebase.auth();
 
-        // 啟動離線優先（Offline Persistence）基因，保證透天厝死角流暢開工
         db.enablePersistence().catch((err) => {
-            console.warn("離線快取警告：", err.code);
+            console.warn("離線快取生效：", err.code);
         });
 
         const SECTION_TEMPLATES = [
@@ -415,7 +434,6 @@
         let GLOBAL_STORE = { activeTabId: "", tabs: {} };
         let activeListenerUnsubscribe = null;
 
-        // 監聽管理員登入狀態 (不刻意登出，這輩子開啟網頁都直接進名冊)
         auth.onAuthStateChanged(user => {
             if (user) {
                 CURRENT_USER_UID = user.uid;
@@ -445,14 +463,11 @@
             }
         }
 
-        // ⚔️ 實時同步核心：綁定狀態燈、實施高強度全空值補償
         function syncDatabaseWithCloud() {
             if (!CURRENT_USER_UID) return;
 
-            // 監聽雲端資料庫（有網時連動，斷網時由本機快取無縫接軌）
             activeListenerUnsubscribe = db.collection("users").doc(CURRENT_USER_UID)
                 .onSnapshot(doc => {
-                    // 🟢 🟡 🔵 實時更新畫面右上角狀態燈
                     const light = document.getElementById("status-light");
                     const txt = document.getElementById("status-text");
                     
@@ -470,7 +485,6 @@
                     if (doc.exists) {
                         GLOBAL_STORE = doc.data();
                     } else {
-                        // 初次登入的真空狀態，秒速原地重生成 100% 精準健全的預設結構
                         const defaultId = "tab_" + Date.now();
                         GLOBAL_STORE = { activeTabId: defaultId, tabs: {} };
                         GLOBAL_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
@@ -480,7 +494,7 @@
                     renderTabs();
                     renderActiveContent();
                 }, err => {
-                    console.error("同步攔截器錯誤:", err);
+                    console.error("同步錯誤:", err);
                 });
         }
 
@@ -596,11 +610,12 @@
                                     <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
                                     <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
                                     
-                                    <div class="photo-box" onclick="triggerFileUpload('${slotId}')">
+                                    <div class="photo-box">
                                         <img id="img_${slotId}" src="${catImg}" style="display:${hasImg ? 'block' : 'none'};">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
                                     </div>
-                                    <input type="file" class="file-input" id="file_${slotId}" accept="image/*" onchange="compressPhoto(event, '${slotId}')">
+                                    
+                                    <input type="file" class="native-file-overlay" id="file_${slotId}" accept="image/*" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
                                 </div>
                                 <div class="cat-right">
                                     <input type="text" class="cat-name-input" id="name_${slotId}" value="${catName}" placeholder="輸入毛孩名字 (留空則不列印)" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
@@ -711,14 +726,6 @@
             }
         }
 
-        function triggerFileUpload(slotId) {
-            const activeId = GLOBAL_STORE.activeTabId;
-            if (!GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId] || GLOBAL_STORE.tabs[activeId].isLocked !== false) return; 
-            const f = document.getElementById(`file_${slotId}`);
-            // 鋼鐵修復：以最純淨的點擊氣泡彈出原生相機選單，不被任何 browser 屏蔽
-            if (f) f.click();
-        }
-
         function compressPhoto(event, slotId) {
             const file = event.target.files[0];
             if (!file) return;
@@ -728,8 +735,6 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    
-                    // 🌟 核心把關：將寬高完美限制在 240px，一張照片僅 10KB 左右，100% 免疫任何流量爆滿或傳輸延遲
                     const MAX_BOUND = 240; 
                     let width = img.width;
                     let height = img.height;
@@ -788,6 +793,13 @@
             }
         }
 
+        function forceResetToDefault() {
+            const defaultId = "tab_" + Date.now();
+            GLOBAL_STORE = { activeTabId: defaultId, tabs: {} };
+            GLOBAL_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+            saveToCloud();
+        }
+
         function triggerPrintPDF() {
             const activeId = GLOBAL_STORE.activeTabId;
             const data = GLOBAL_STORE.tabs ? GLOBAL_STORE.tabs[activeId] : null;
@@ -817,7 +829,6 @@
             setTimeout(() => { document.title = originalTitle; }, 1000);
         }
 
-        // 監聽手機/筆電斷網與連網事件，一秒動態切換狀態燈
         window.addEventListener('online', () => { saveToCloud(); });
         window.addEventListener('offline', () => {
             const light = document.getElementById("status-light");
