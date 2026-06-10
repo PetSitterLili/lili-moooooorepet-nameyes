@@ -39,10 +39,10 @@
             line-height: 1.5;
         }
 
-        /* 隱藏列印元件 */
+        /* 預設在一般網頁畫面上隱藏列印專用元件 */
         .print-header, .print-check-badge, .print-footer { display: none !important; }
 
-        /* 網頁 UI 樣式 (維持原狀) */
+        /* 網頁 UI 樣式 */
         .tabs-container { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
         .tab { padding: 10px 16px; background-color: #eae5df; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: bold; color: #666666; cursor: pointer; border: 1px solid #eae5df; border-bottom: none; }
         .tab.active { background-color: #ffffff; color: var(--m-purple); border-color: #eae5df; }
@@ -150,6 +150,8 @@
                 width: 100% !important; 
                 background: #ffffff !important; 
                 page-break-inside: avoid !important;
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
             }
             .print-footer-flex { 
                 display: flex; 
@@ -161,8 +163,8 @@
             .print-footer-left { 
                 font-size: 10pt !important; 
                 color: var(--m-purple) !important; 
-                font-style: italic !important; /* 加斜體 */
-                line-height: 1.8 !important; /* 兩行排列的高度感 */
+                font-style: italic !important; 
+                line-height: 1.8 !important; 
                 max-width: 60%; 
             }
             .print-footer-right { 
@@ -183,6 +185,10 @@
                 height: 55px !important; 
                 border: 1px solid var(--milk-tea); 
                 padding: 2px; 
+                background: #ffffff; 
+                display: inline-block !important; 
+                visibility: visible !important;
+                opacity: 1 !important;
             }
         }
     </style>
@@ -428,11 +434,22 @@
         function triggerPrintPDF() {
             const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
             const now = new Date();
-            const timeString = `${now.getFullYear()}/${now.getMonth()+1}/${now.getDate()} ${now.getHours()}:${now.getMinutes()}`;
+            
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const date = String(now.getDate()).padStart(2, '0');
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            const timeString = `${year}/${month}/${date} ${hours}:${minutes}`;
+            
             document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
             document.getElementById("print-main-title").innerText = `嘉義寵物保姆ㄌㄌ // ${data.name}點名冊`;
+            
+            // 修正處：高階客製化檔名 (6位數年月日)
             const oldT = document.title;
-            document.title = `【點名冊】_${data.name}_${now.getTime()}`;
+            const yy = String(year).slice(-2);
+            document.title = `ㄌㄌ照護｜${yy}${month}${date}${data.name}點名板`;
+            
             window.print();
             setTimeout(() => { document.title = oldT; }, 1000);
         }
