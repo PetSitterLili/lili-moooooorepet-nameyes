@@ -18,21 +18,12 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@500;700;900&display=swap" rel="stylesheet">
 
     <style>
-        :root {
-            --m-purple: #5A4E70;
-            --m-bg: #f6f5f2;
-            --gold: #A68D5F;
-            --milk-tea: #F2E9E1;
-            --cream: #FFFDF9;
-        }
-
         *, *::before, *::after { box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Noto Sans TC", sans-serif;
-            background-color: var(--m-bg);
+            background-color: #f6f5f2;
             color: #333333;
             margin: 0;
             padding: 20px 12px 100px 12px;
@@ -42,154 +33,364 @@
         /* 預設在一般網頁畫面上隱藏列印專用元件 */
         .print-header, .print-check-badge, .print-footer { display: none !important; }
 
-        /* 網頁 UI 樣式 */
-        .tabs-container { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; }
-        .tab { padding: 10px 16px; background-color: #eae5df; border-radius: 8px 8px 0 0; font-size: 14px; font-weight: bold; color: #666666; cursor: pointer; border: 1px solid #eae5df; border-bottom: none; }
-        .tab.active { background-color: #ffffff; color: var(--m-purple); border-color: #eae5df; }
-        .tab-add { padding: 10px 14px; background-color: var(--m-purple); color: #ffffff; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer; }
-        .header-panel { background-color: #ffffff; border-radius: 0 0 16px 16px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(0,0,0,0.03); border: 1px solid #eae5df; margin-top: -13px; }
-        .case-title-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid #f0ede9; padding-bottom: 12px; flex-wrap: wrap; gap: 10px; }
-        .case-name-display { font-size: 18px; font-weight: bold; color: var(--m-purple); display: flex; align-items: center; gap: 8px; }
-        .btn { flex: 1; min-width: 120px; padding: 12px; border: none; border-radius: 8px; font-size: 13px; font-weight: bold; cursor: pointer; text-align: center; }
+        /* 頂部導覽與分頁標籤 */
+        .tabs-container {
+            display: flex;
+            gap: 6px;
+            overflow-x: auto;
+            padding-bottom: 8px;
+            margin-bottom: 12px;
+            min-height: 40px;
+        }
+        .tab {
+            padding: 10px 16px;
+            background-color: #eae5df;
+            border-radius: 8px 8px 0 0;
+            font-size: 14px;
+            font-weight: bold;
+            color: #666666;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+            border: 1px solid #eae5df;
+            border-bottom: none;
+        }
+        .tab.active {
+            background-color: #ffffff;
+            color: #50415a;
+            border-color: #eae5df;
+            box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+        }
+        .tab-add {
+            padding: 10px 14px;
+            background-color: #50415a;
+            color: #ffffff;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            white-space: nowrap;
+        }
+
+        /* 控制台 */
+        .header-panel {
+            background-color: #ffffff;
+            border-radius: 0 0 16px 16px;
+            padding: 20px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.03);
+            border: 1px solid #eae5df;
+            margin-top: -13px;
+        }
+        .case-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            border-bottom: 1px solid #f0ede9;
+            padding-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        .case-name-display {
+            font-size: 18px;
+            font-weight: bold;
+            color: #50415a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .control-buttons {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .btn {
+            flex: 1;
+            min-width: 120px;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 13px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
         .btn-reset-attendance { background-color: #d9825b; color: white; }
-        .btn-lock { background-color: var(--gold); color: white; }
+        .btn-lock { background-color: #b5945b; color: white; }
         .btn-lock.is-locked { background-color: #6c757d; }
-        .btn-print { background-color: var(--m-purple); color: white; }
-        .cloud-status-badge { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: bold; padding: 4px 10px; border-radius: 20px; background-color: #f0ede9; }
+        .btn-print { background-color: #50415a; color: white; }
+        .btn-delete { background-color: #c94a4a; color: white; padding: 6px 12px; border-radius: 6px; font-size: 12px; border: none; font-weight: bold; cursor: pointer; }
+        
+        .btn-rename { padding: 4px 8px; font-size: 12px; background-color: #eae5df; border: none; border-radius: 4px; cursor: pointer; color: #555555; }
+        .btn-logout { background: none; border: none; font-size: 11px; color: #999999; text-decoration: underline; cursor: pointer; margin-left: 10px; }
+
+        /* 雲端安全動態狀態燈視覺 */
+        .cloud-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background-color: #f0ede9;
+        }
         .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
-        .status-dot.green { background-color: #4a9e67; }
-        .section-block { background-color: #ffffff; border-radius: 16px; padding: 16px; margin-bottom: 24px; border: 1px solid #eae5df; }
-        .cat-card { border: 1px solid #f0ede9; border-radius: 12px; padding: 12px; margin-bottom: 12px; background-color: #faf9f6; position: relative; }
-        .cat-card.checked { background-color: #f1f8f3; border-color: #c2e2cc; }
-        .photo-box { width: 66px; height: 66px; border-radius: 50%; border: 2px dashed var(--gold); background-color: #ffffff; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+        .status-dot.green { background-color: #4a9e67; box-shadow: 0 0 6px #4a9e67; }
+        .status-dot.yellow { background-color: #b5945b; box-shadow: 0 0 6px #b5945b; }
+        .status-dot.blue { background-color: #4a7bb5; box-shadow: 0 0 6px #4a7bb5; }
+
+        /* 區域區塊 */
+        .section-block {
+            background-color: #ffffff;
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 24px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            border: 1px solid #eae5df;
+        }
+        .section-header {
+            border-bottom: 2px solid #eae5df;
+            padding-bottom: 10px;
+            margin-bottom: 16px;
+        }
+        .section-title-input {
+            font-size: 16px;
+            font-weight: bold;
+            color: #50415a;
+            border: none;
+            background: transparent;
+            width: 100%;
+            padding: 4px;
+            border-bottom: 1px dashed #b5945b;
+        }
+        .section-title-input:focus { outline: none; border-bottom: 1px solid #50415a; }
+
+        /* 貓咪卡片 */
+        .cat-card {
+            border: 1px solid #f0ede9;
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 12px;
+            background-color: #faf9f6;
+            position: relative;
+        }
+        .cat-card.checked {
+            background-color: #f1f8f3;
+            border-color: #c2e2cc;
+        }
+        .cat-row { display: flex; gap: 12px; align-items: flex-start; }
+        .cat-left {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 10px;
+            min-width: 70px;
+            position: relative;
+        }
+        .cat-checkbox { width: 30px; height: 30px; cursor: pointer; accent-color: #4a9e67; }
+        
+        /* 大頭貼容器 */
+        .photo-box {
+            width: 66px;
+            height: 66px;
+            border-radius: 50%;
+            border: 2px dashed #b5945b;
+            background-color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+            cursor: pointer;
+        }
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-        .native-file-overlay { position: absolute !important; top: 0 !important; left: 0 !important; width: 100% !important; height: 100% !important; opacity: 0 !important; z-index: 99; cursor: pointer; }
-        .is-locked-mode input, .is-locked-mode textarea { background-color: #f1ede7 !important; cursor: not-allowed; }
+        .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
+        
+        /* 三星 Chrome 相機終極破防線 */
+        .native-file-overlay {
+            position: absolute !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100% !important;
+            height: 100% !important;
+            opacity: 0 !important;
+            z-index: 99 !important;
+            cursor: pointer;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+
+        .cat-right { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .cat-name-input {
+            width: 100%; font-size: 14px; font-weight: bold; padding: 6px 8px;
+            border: 1px solid #eae5df; border-radius: 6px; background-color: #ffffff;
+        }
+        .cat-desc-textarea {
+            width: 100%; height: 60px; font-size: 13px; padding: 6px 8px;
+            border: 1px solid #eae5df; border-radius: 6px; resize: none;
+            background-color: #ffffff; font-family: inherit;
+        }
+        
+        .is-locked-mode input, .is-locked-mode textarea {
+            background-color: #f1ede7 !important;
+            border-color: #e2ded8 !important;
+            color: #555555 !important;
+            cursor: not-allowed;
+        }
+        .is-locked-mode .photo-box {
+            border-style: solid;
+            background-color: #eae5df;
+            cursor: not-allowed;
+        }
+        .is-locked-mode .native-file-overlay {
+            display: none !important;
+        }
+
+        .section-summary { margin-top: 16px; padding-top: 12px; border-top: 1px dashed #eae5df; }
+        .summary-title { font-size: 12px; font-weight: bold; color: #b5945b; margin-bottom: 6px; }
+        .summary-textarea {
+            width: 100%; height: 60px; font-size: 13px; padding: 8px;
+            border: 1px solid #eae5df; border-radius: 6px; background-color: #faf9f6; resize: none;
+        }
+
+        .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
+
+        /* 🔒 警衛室登入遮罩介面 */
+        .auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f6f5f2; z-index: 9999; display: flex;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .auth-box {
+            background-color: #ffffff; width: 100%; max-width: 360px;
+            padding: 30px 24px; border-radius: 16px; border: 1px solid #eae5df;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center;
+        }
+        .auth-title { font-size: 20px; font-weight: bold; color: #50415a; margin-bottom: 6px; }
+        .auth-subtitle { font-size: 12px; color: #b5945b; margin-bottom: 24px; }
+        .auth-input {
+            width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #eae5df;
+            border-radius: 8px; font-size: 14px; background-color: #faf9f6;
+        }
+        .auth-input:focus { outline: none; border-color: #50415a; }
+        .auth-btn {
+            width: 100%; padding: 14px; background-color: #50415a; color: white;
+            border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer;
+        }
 
         /* --------------------------------------------------- */
-        /* ✨ 列印客製化 (A4 PDF 高端質感) */
+        /* 🌟 核心增幅：高端莫蘭迪調性 A4 PDF 列印美化規則 */
         /* --------------------------------------------------- */
         @media print {
-            @page { size: A4; margin: 15mm 12mm; }
-            body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; color: #000; }
-            .tabs-container, .header-panel, .btn, .native-file-overlay, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay, .btn-logout, .cat-checkbox { display: none !important; }
+            @page { size: A4; margin: 18mm 14mm; }
+            body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; color: #3A3530; }
+            .tabs-container, .header-panel, .btn, .native-file-overlay, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay, .btn-logout { display: none !important; }
             
-            /* 標題區：莫蘭迪紫 + 褐金線條 */
+            /* 高級品牌調性頁首 */
             .print-header {
                 display: block !important;
                 text-align: center;
-                border-bottom: 2.5px solid var(--gold);
-                padding-bottom: 15px;
-                margin-bottom: 30px;
+                border-bottom: 2px solid #8A7B93 !important; /* 莫蘭迪灰紫下襯線 */
+                padding-bottom: 16px !important;
+                margin-bottom: 26px !important;
             }
             .print-header h1 { 
-                font-family: 'Noto Serif TC', serif !important;
-                color: var(--m-purple) !important; 
-                font-size: 22pt !important; 
-                margin: 0 0 6px 0; 
-                font-weight: 900 !important; 
+                font-family: "Noto Serif TC", "思源宋體", serif !important; 
+                color: #50415a !important; /* 精緻低飽和莫蘭迪紫大標 */
+                font-size: 21pt !important; 
+                margin: 0 0 6px 0 !important; 
+                font-weight: 800 !important; 
+                letter-spacing: 1px !important;
             }
-            .print-header p { color: var(--gold); font-size: 10pt; margin: 0; font-style: italic; letter-spacing: 1px; }
+            .print-header p { color: #8E8270 !important; font-size: 9.5pt !important; margin: 0 !important; font-style: italic !important; letter-spacing: 0.5px !important; }
 
-            /* 區域區塊：奶褐呼吸感佈局 */
-            .section-block { 
-                box-shadow: none !important; 
-                border: none !important; 
-                padding: 0 !important; 
-                margin-bottom: 35px !important; 
-                page-break-inside: avoid; 
-            }
-            .section-header { 
-                border-bottom: 1.5px solid var(--m-purple) !important; 
-                margin-bottom: 15px !important;
-                padding-left: 5px;
-            }
+            /* 區域區塊細緻化 */
+            .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 28px !important; page-break-inside: avoid !important; }
+            .section-header { border-bottom: 1.5px solid #C5A880 !important; margin-bottom: 14px !important; padding-bottom: 4px !important; } /* 奢華褐金下襯線 */
             .section-title-input { 
-                font-family: "Noto Serif TC", serif !important;
-                font-size: 14pt !important; 
-                font-weight: 700 !important; 
-                color: var(--m-purple) !important; 
+                font-family: "Noto Serif TC", "思源宋體", serif !important;
+                font-size: 13.5pt !important; 
+                border: none !important; 
+                font-weight: bold !important; 
+                color: #50415a !important; /* 莫蘭迪紫中標 */
                 background: transparent !important;
+                letter-spacing: 0.5px !important;
             }
 
-            /* 貓咪卡片：精緻框線 */
+            /* 毛孩日誌卡片高級精緻化 */
             .cat-card { 
-                page-break-inside: avoid; 
-                border: 1px solid var(--milk-tea) !important; 
-                background-color: var(--cream) !important; 
+                page-break-inside: avoid !important; 
+                border: 1px solid #E4DFD9 !important; /* 輕薄奶褐色細邊框 */
+                background-color: #FAF9F5 !important; /* 奢華溫潤奶白底色 */
                 margin-bottom: 12px !important; 
-                padding: 12px !important; 
-                border-radius: 10px !important;
+                padding: 14px !important; 
+                border-radius: 8px !important;
+            }
+            /* 當日已確認點名的精緻反差色 */
+            .cat-card.checked {
+                background-color: #F3F6F3 !important; /* 低飽和高雅淡綠 */
+                border-color: #CADA9E !important;
             }
             .cat-card.empty-target { display: none !important; }
 
-            .cat-name-input { font-size: 12.5pt !important; color: var(--m-purple) !important; font-weight: 700 !important; }
-            .cat-desc-textarea { font-size: 10.5pt !important; line-height: 1.6 !important; color: #444 !important; }
+            .cat-name-input { border: none !important; padding: 0 !important; font-size: 12.5pt !important; font-weight: bold !important; color: #3A3530 !important; background: transparent !important;}
+            .cat-desc-textarea { border: none !important; padding: 4px 0 0 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; color: #555555 !important; background: transparent !important; line-height: 1.6 !important;}
 
-            /* 點名標籤：品牌低飽和色 */
-            .print-check-badge { 
-                display: block !important; 
-                font-size: 8.5pt !important; 
-                font-weight: 700 !important; 
-                padding: 3px 8px; 
-                border-radius: 5px; 
-                margin-bottom: 8px;
-            }
-            .badge-yes { color: var(--m-purple) !important; border: 1px solid var(--m-purple); background-color: var(--milk-tea) !important; }
-            .badge-no { color: #888 !important; border: 1px solid #ddd; background-color: #f9f9f9 !important; }
-
-            .photo-box { width: 60px !important; height: 60px !important; border: 1.5px solid var(--gold) !important; }
+            .cat-checkbox { display: none !important; }
             
-            .summary-title { font-family: "Noto Serif TC", serif !important; font-weight: 700 !important; color: var(--gold) !important; font-size: 10.5pt !important; }
+            /* 點名狀態標籤莫蘭迪調色 */
+            .print-check-badge { display: block !important; font-size: 9pt !important; font-weight: bold !important; padding: 3px 8px !important; border-radius: 4px !important; text-align: center !important; white-space: nowrap !important; letter-spacing: 0.5px !important; }
+            .badge-yes { color: #5A7463 !important; border: 1px solid #CADA9E !important; background-color: #EDF3EE !important; }
+            .badge-no { color: #A66363 !important; border: 1px solid #E4D2D2 !important; background-color: #F7EFEF !important; }
 
-            /* 頁尾排版：兩行斜體 + IG 右下方位 */
+            /* 圓形照片外框 */
+            .photo-box { width: 56px !important; height: 56px !important; border: 1px solid #C5A880 !important; background-color: #ffffff !important; border-radius: 50% !important; }
+            
+            /* 空間維護備忘高級化 */
+            .section-summary { border-top: 1px dashed #C4BBAF !important; margin-top: 14px !important; padding-top: 10px !important; page-break-inside: avoid !important; }
+            .summary-title {
+                font-family: "Noto Serif TC", "思源宋體", serif !important;
+                font-weight: bold !important;
+                font-size: 10.5pt !important;
+                color: #C5A880 !important; /* 褐金色題頭 */
+                margin-bottom: 4px !important;
+            }
+            .summary-textarea { border: none !important; padding: 4px 0 0 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; color: #4A4540 !important; background: transparent !important; line-height: 1.5 !important; }
+            
+            /* 頁尾自然流動佈局與強效色彩輸出防線 */
             .print-footer { 
                 display: block !important; 
+                visibility: visible !important;
                 position: relative !important; 
-                margin-top: 50px !important; 
+                margin-top: 45px !important; 
                 width: 100% !important; 
                 background: #ffffff !important; 
                 page-break-inside: avoid !important;
                 -webkit-print-color-adjust: exact !important;
                 print-color-adjust: exact !important;
             }
-            .print-footer-flex { 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: flex-end; 
-                border-top: 1px solid var(--gold); 
-                padding-top: 15px; 
-            }
-            .print-footer-left { 
-                font-size: 10pt !important; 
-                color: var(--m-purple) !important; 
-                font-style: italic !important; 
-                line-height: 1.8 !important; 
-                max-width: 60%; 
-            }
-            .print-footer-right { 
-                text-align: right; 
-                display: flex;
-                flex-direction: column;
-                align-items: flex-end;
-                gap: 5px;
-            }
-            .footer-text-block { 
-                font-size: 9pt !important; 
-                color: var(--gold) !important; 
-                font-weight: bold;
-                margin-bottom: 2px;
-            }
+            .print-footer-flex { display: flex !important; justify-content: space-between !important; align-items: flex-end !important; border-top: 1px solid #E4DFD9 !important; padding-top: 12px !important; width: 100% !important; }
+            .print-footer-left { font-size: 9.5pt !important; color: #7A7267 !important; font-style: italic !important; text-align: left !important; max-width: 65% !important; line-height: 1.5 !important; }
+            .print-footer-right { font-size: 8.5pt !important; color: #8E8270 !important; line-height: 1.4 !important; text-align: right !important; }
+            
+            /* 強制讓包含超連結的 QR Code 在紙本現形 */
             .print-qrcode { 
-                width: 55px !important; 
-                height: 55px !important; 
-                border: 1px solid var(--milk-tea); 
-                padding: 2px; 
-                background: #ffffff; 
+                width: 62px !important; 
+                height: 62px !important; 
+                margin-top: 4px !important; 
+                border: 1px solid #E4DFD9 !important; 
+                padding: 3px !important; 
+                background: #ffffff !important; 
                 display: inline-block !important; 
+                vertical-align: middle !important; 
+                margin-left: 10px !important; 
                 visibility: visible !important;
                 opacity: 1 !important;
             }
+            .footer-text-block { display: inline-block !important; vertical-align: middle !important; text-align: right !important; max-width: 220px !important; font-weight: bold !important; color: #50415a !important; }
         }
     </style>
 </head>
@@ -199,7 +400,7 @@
         <div class="auth-box">
             <div class="auth-title">高級毛孩 CRM 工作台</div>
             <div class="auth-subtitle">嘉義寵物保姆ㄌㄌ // 尊寵出勤防線</div>
-            <input type="email" class="auth-input" id="auth-email" placeholder="管理員帳號" value="petsitterlili2025@gmail.com">
+            <input type="email" class="auth-input" id="auth-email" placeholder="管理員帳號 (Email)" value="petsitterlili2025@gmail.com">
             <input type="password" class="auth-input" id="auth-password" placeholder="請輸入超級密碼">
             <button class="auth-btn" onclick="handleLogin()">安全登入系統</button>
         </div>
@@ -235,17 +436,17 @@
 
     <div id="app-content"></div>
 
-    <div class="app-footer-quote">「多毛孩的家庭，需要加倍溫柔的眼睛；<br>我們用最細緻的看顧，安放您的每一份牽掛。」</div>
+    <div class="app-footer-quote">「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」</div>
     
     <div class="print-footer">
         <div class="print-footer-flex">
             <div class="print-footer-left">
-                「多毛孩的家庭，需要加倍溫柔的眼睛；<br>我們用最細緻的看顧，安放您的每一份牽掛。」
+                「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」
             </div>
             <div class="print-footer-right">
-                <div class="footer-text-block">歡迎追蹤 ㄌㄌ，你的小寶貝可能在鏡頭裡喲！</div>
-                <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank">
-                    <img class="print-qrcode" src="IGQRCODE.png" onerror="this.src='IGQRCODE.jpg'">
+                <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank" style="text-decoration: none; color: inherit; display: block;">
+                    <div class="footer-text-block">歡迎追蹤 ㄌㄌ，因為你家小寶貝有可能上鏡頭喔！</div>
+                    <img class="print-qrcode" src="IGQRCODE.png" onerror="this.src='IGQRCODE.jpg'" alt="IG QRCODE">
                 </a>
             </div>
         </div>
@@ -266,7 +467,9 @@
         const db = firebase.firestore();
         const auth = firebase.auth();
 
-        db.enablePersistence().catch((err) => { console.warn("離線快取：", err.code); });
+        db.enablePersistence().catch((err) => {
+            console.warn("離線快取生效：", err.code);
+        });
 
         const SECTION_TEMPLATES = [
             { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 12 },
@@ -293,7 +496,10 @@
         function handleLogin() {
             const email = document.getElementById("auth-email").value;
             const password = document.getElementById("auth-password").value;
+            if (!password) { alert("請輸入管理員超級密碼。"); return; }
+            
             auth.signInWithEmailAndPassword(email, password)
+                .then(() => { document.getElementById("control-panel").style.opacity = "1"; })
                 .catch(err => { alert("密碼錯誤，警衛室拒絕通行！"); });
         }
 
@@ -306,56 +512,89 @@
 
         function syncDatabaseWithCloud() {
             if (!CURRENT_USER_UID) return;
+
             activeListenerUnsubscribe = db.collection("users").doc(CURRENT_USER_UID)
                 .onSnapshot(doc => {
                     const light = document.getElementById("status-light");
                     const txt = document.getElementById("status-text");
-                    if (doc.metadata.hasPendingWrites) { light.className = "status-dot yellow"; txt.innerText = "同步中..."; }
-                    else if (!navigator.onLine) { light.className = "status-dot blue"; txt.innerText = "離線守護中"; }
-                    else { light.className = "status-dot green"; txt.innerText = "雲端已安全鎖定"; }
+                    
+                    if (doc.metadata.hasPendingWrites) {
+                        light.className = "status-dot yellow";
+                        txt.innerText = "同步中，請稍候";
+                    } else if (!navigator.onLine) {
+                        light.className = "status-dot blue";
+                        txt.innerText = "離線守護中 // 儲存於手機";
+                    } else {
+                        light.className = "status-dot green";
+                        txt.innerText = "雲端已安全鎖定";
+                    }
 
-                    if (doc.exists) { GLOBAL_STORE = doc.data(); }
-                    else { forceResetToDefault(); }
+                    if (doc.exists) {
+                        GLOBAL_STORE = doc.data();
+                    } else {
+                        const defaultId = "tab_" + Date.now();
+                        GLOBAL_STORE = { activeTabId: defaultId, tabs: {} };
+                        GLOBAL_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+                        saveToCloud();
+                    }
+
                     renderTabs();
                     renderActiveContent();
+                }, err => {
+                    console.error("同步錯誤:", err);
                 });
         }
 
         function saveToCloud() {
             if (!CURRENT_USER_UID) return;
-            db.collection("users").doc(CURRENT_USER_UID).set(GLOBAL_STORE);
+            db.collection("users").doc(CURRENT_USER_UID).set(GLOBAL_STORE).catch(e => {});
         }
 
         function createBlankTabData(name) {
             let tabData = { name: name, isLocked: true, sections: {}, cats: {} };
             SECTION_TEMPLATES.forEach(sec => {
                 tabData.sections[sec.id] = { title: sec.title, summary: "" };
-                for(let i=1; i<=sec.slots; i++) { tabData.cats[`${sec.id}_cat_${i}`] = { checked: false, name: "", desc: "", img: "" }; }
+                for(let i=1; i<=sec.slots; i++) {
+                    tabData.cats[`${sec.id}_cat_${i}`] = { checked: false, name: "", desc: "", img: "" };
+                }
             });
             return tabData;
         }
 
         function renderTabs() {
             const bar = document.getElementById("tabs-bar");
+            if (!bar) return;
             bar.innerHTML = "";
+            
             const tabsObj = GLOBAL_STORE.tabs || {};
             Object.keys(tabsObj).forEach(id => {
+                const t = tabsObj[id];
+                if (!t || !t.name) return; 
                 const tabEl = document.createElement("div");
                 tabEl.className = `tab ${id === GLOBAL_STORE.activeTabId ? 'active' : ''}`;
-                tabEl.innerText = tabsObj[id].name;
-                tabEl.onclick = () => { GLOBAL_STORE.activeTabId = id; saveToCloud(); };
+                tabEl.innerText = t.name;
+                tabEl.onclick = () => {
+                    GLOBAL_STORE.activeTabId = id;
+                    saveToCloud();
+                    renderTabs();
+                    renderActiveContent();
+                };
                 bar.appendChild(tabEl);
             });
+
             const addEl = document.createElement("div");
             addEl.className = "tab-add";
             addEl.innerText = "＋ 新增案場";
             addEl.onclick = () => {
-                const name = prompt("輸入案場名稱：");
-                if (name) {
+                const name = prompt("請輸入新創到府案場名稱（例如：福吉小寶家）：");
+                if (name && name.trim() !== "") {
                     const newId = "tab_" + Date.now();
-                    GLOBAL_STORE.tabs[newId] = createBlankTabData(name);
+                    if (!GLOBAL_STORE.tabs) GLOBAL_STORE.tabs = {};
+                    GLOBAL_STORE.tabs[newId] = createBlankTabData(name.trim());
                     GLOBAL_STORE.activeTabId = newId;
                     saveToCloud();
+                    renderTabs();
+                    renderActiveContent();
                 }
             };
             bar.appendChild(addEl);
@@ -364,106 +603,291 @@
         function renderActiveContent() {
             const activeId = GLOBAL_STORE.activeTabId;
             const content = document.getElementById("app-content");
+            if (!content) return;
             content.innerHTML = "";
+
             const titleDisplay = document.getElementById("current-case-display");
-            if (!activeId || !GLOBAL_STORE.tabs[activeId]) { titleDisplay.innerText = "目前無案場"; return; }
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) {
+                if (titleDisplay) titleDisplay.innerText = "目前無案場";
+                return;
+            }
 
             const data = GLOBAL_STORE.tabs[activeId];
             const isTabLocked = data.isLocked !== false; 
-            titleDisplay.innerText = data.name;
+            if (titleDisplay) titleDisplay.innerText = `${data.name || "未命名"}`;
+            
             const lockBtn = document.getElementById("lock-btn");
-            lockBtn.innerText = isTabLocked ? "解鎖編輯檔案" : "🔒 鎖定檔案防誤觸";
-            lockBtn.className = `btn btn-lock ${isTabLocked ? 'is-locked' : ''}`;
+            if (lockBtn) {
+                if (isTabLocked) {
+                    lockBtn.innerText = "解鎖編輯檔案";
+                    lockBtn.classList.add("is-locked");
+                } else {
+                    lockBtn.innerText = "🔒 鎖定檔案防誤觸";
+                    lockBtn.classList.remove("is-locked");
+                }
+            }
 
             SECTION_TEMPLATES.forEach(sec => {
-                const secData = data.sections[sec.id] || { title: sec.title, summary: "" };
-                let sectionHTML = `<div class="section-block ${isTabLocked ? 'is-locked-mode' : ''}">
-                    <div class="section-header"><input type="text" class="section-title-input" value="${secData.title}" oninput="updateTextData('${sec.id}', 'title', this.value)" ${isTabLocked ? 'readonly' : ''}></div>`;
+                const sectionsContainer = data.sections || {};
+                const secData = sectionsContainer[sec.id] || { title: sec.title, summary: "" };
+                
+                let sectionHTML = `
+                    <div class="section-block ${isTabLocked ? 'is-locked-mode' : ''}" id="${sec.id}">
+                        <div class="section-header">
+                            <input type="text" class="section-title-input" id="title_${sec.id}" value="${secData.title || sec.title}" ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'title', this.value)">
+                        </div>
+                        <div class="cat-list">
+                `;
+
                 for (let i = 1; i <= sec.slots; i++) {
                     let slotId = `${sec.id}_cat_${i}`;
-                    const cat = data.cats[slotId] || { checked: false, name: "", desc: "", img: "" };
-                    sectionHTML += `<div class="cat-card ${cat.checked ? 'checked' : ''} ${cat.name === '' ? 'empty-target' : ''}">
-                        <div class="cat-row">
-                            <div class="cat-left">
-                                <input type="checkbox" class="cat-checkbox" ${cat.checked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
-                                <span class="print-check-badge ${cat.checked ? 'badge-yes' : 'badge-no'}">${cat.checked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
-                                <div class="photo-box">
-                                    <img src="${cat.img}" style="display:${cat.img ? 'block' : 'none'};">
-                                    <span class="photo-placeholder" style="display:${cat.img ? 'none' : 'block'};">📷</span>
-                                    <input type="file" class="native-file-overlay" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
+                    const catsContainer = data.cats || {};
+                    const cat = catsContainer[slotId] || { checked: false, name: "", desc: "", img: "" };
+                    
+                    const isChecked = cat.checked === true;
+                    const catName = cat.name || "";
+                    const catDesc = cat.desc || "";
+                    const catImg = cat.img || "";
+                    const hasImg = catImg !== "";
+
+                    sectionHTML += `
+                        <div class="cat-card ${isChecked ? 'checked' : ''} ${catName.trim() === '' ? 'empty-target' : ''}" id="card_${slotId}">
+                            <div class="cat-row">
+                                <div class="cat-left">
+                                    <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
+                                    <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
+                                    
+                                    <div class="photo-box">
+                                        <img id="img_${slotId}" src="${catImg}" style="display:${hasImg ? 'block' : 'none'};">
+                                        <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
+                                        <input type="file" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
+                                    </div>
+                                </div>
+                                <div class="cat-right">
+                                    <input type="text" class="cat-name-input" id="name_${slotId}" value="${catName}" placeholder="輸入毛孩名字 (留空則不列印)" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
+                                    <textarea class="cat-desc-textarea" id="desc_${slotId}" placeholder="點擊呼叫鍵盤口述/打字注意事項..." ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'desc', this.value)">${catDesc}</textarea>
                                 </div>
                             </div>
-                            <div class="cat-right">
-                                <input type="text" class="cat-name-input" value="${cat.name}" placeholder="輸入毛孩名字" oninput="updateCatData('${slotId}', 'name', this.value)" ${isTabLocked ? 'readonly' : ''}>
-                                <textarea class="cat-desc-textarea" placeholder="口述/打字注意事項..." oninput="updateCatData('${slotId}', 'desc', this.value)" ${isTabLocked ? 'readonly' : ''}>${cat.desc}</textarea>
-                            </div>
                         </div>
-                    </div>`;
+                    `;
                 }
-                sectionHTML += `<div class="section-summary"><div class="summary-title">📌 尊寵守護焦點 // 細緻空間維護備忘</div>
-                    <textarea class="summary-textarea" oninput="updateTextData('${sec.id}', 'summary', this.value)" ${isTabLocked ? 'readonly' : ''}>${secData.summary}</textarea></div></div>`;
+
+                sectionHTML += `
+                        </div>
+                        <div class="section-summary ${isTabLocked ? 'is-locked-mode' : ''}">
+                            <div class="summary-title">📌 尊寵守護焦點 // 細緻空間維護備忘</div>
+                            <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌 or 動線備忘..." ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary || ""}</textarea>
+                        </div>
+                    </div>
+                `;
                 content.innerHTML += sectionHTML;
             });
         }
 
-        function updateTextData(secId, key, val) { GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].sections[secId][key] = val; saveToCloud(); }
-        function updateCatData(slotId, key, val) { GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].cats[slotId][key] = val; saveToCloud(); }
-        function renameCurrentTab() { const n = prompt("輸入案場名稱：", GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].name); if (n) { GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].name = n; saveToCloud(); renderTabs(); renderActiveContent(); } }
-        function toggleLockState() { const activeId = GLOBAL_STORE.activeTabId; GLOBAL_STORE.tabs[activeId].isLocked = !GLOBAL_STORE.tabs[activeId].isLocked; saveToCloud(); renderActiveContent(); }
-        function toggleAttendance(slotId) { GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].cats[slotId].checked = !GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].cats[slotId].checked; saveToCloud(); renderActiveContent(); }
-        
+        function updateTextData(secId, key, val) {
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) {
+                if (!GLOBAL_STORE.tabs[activeId].sections) GLOBAL_STORE.tabs[activeId].sections = {};
+                if (!GLOBAL_STORE.tabs[activeId].sections[secId]) GLOBAL_STORE.tabs[activeId].sections[secId] = {};
+                GLOBAL_STORE.tabs[activeId].sections[secId][key] = val;
+                saveToCloud();
+            }
+        }
+
+        function updateCatData(slotId, key, val) {
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+            if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
+            
+            GLOBAL_STORE.tabs[activeId].cats[slotId][key] = val;
+            
+            const card = document.getElementById(`card_${slotId}`);
+            if (card && key === 'name') {
+                if (val.trim() !== "") card.classList.remove("empty-target");
+                else card.classList.add("empty-target");
+            }
+            saveToCloud();
+        }
+
+        function renameCurrentTab() {
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            const oldName = GLOBAL_STORE.tabs[activeId].name;
+            const newName = prompt("請輸入修改後的案場客戶名稱：", oldName);
+            if (newName && newName.trim() !== "") {
+                GLOBAL_STORE.tabs[activeId].name = newName.trim();
+                saveToCloud();
+                renderTabs();
+                renderActiveContent();
+            }
+        }
+
+        function resetAttendanceOnly() {
+            if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
+                const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+                if (data && data.cats) {
+                    Object.keys(data.cats).forEach(slotId => {
+                        if (data.cats[slotId]) data.cats[slotId].checked = false;
+                    });
+                    saveToCloud();
+                    renderActiveContent();
+                }
+            }
+        }
+
+        function toggleAttendance(slotId) {
+            const chk = document.getElementById(`check_${slotId}`);
+            const card = document.getElementById(`card_${slotId}`);
+            const badge = document.getElementById(`badge_${slotId}`);
+            
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!chk || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+            if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
+            
+            GLOBAL_STORE.tabs[activeId].cats[slotId].checked = chk.checked;
+            
+            if (card && badge) {
+                if (chk.checked) {
+                    card.classList.add("checked");
+                    badge.className = "print-check-badge badge-yes";
+                    badge.innerText = "✓ 當日已確認點名";
+                } else {
+                    card.classList.remove("checked");
+                    badge.className = "print-check-badge badge-no";
+                    badge.innerText = "✕ 未見到未確認";
+                }
+            }
+            saveToCloud();
+        }
+
+        function toggleLockState() {
+            const activeId = GLOBAL_STORE.activeTabId;
+            const data = GLOBAL_STORE.tabs ? GLOBAL_STORE.tabs[activeId] : null;
+            if (data) {
+                data.isLocked = data.isLocked === false;
+                saveToCloud();
+                renderActiveContent();
+            }
+        }
+
         function compressPhoto(event, slotId) {
-            const file = event.target.files[0]; if (!file) return;
+            const file = event.target.files[0];
+            if (!file) return;
+
             const reader = new FileReader();
-            reader.onload = e => {
+            reader.onload = function(e) {
                 const img = new Image();
-                img.onload = () => {
+                img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX = 240; let w = img.width, h = img.height;
-                    if (w > h) { if (w > MAX) { h *= MAX/w; w = MAX; } } else { if (h > MAX) { w *= MAX/h; h = MAX; } }
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
-                    const b64 = canvas.toDataURL('image/jpeg', 0.5);
-                    GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId].cats[slotId].img = b64; saveToCloud();
+                    const MAX_BOUND = 240; 
+                    let width = img.width;
+                    let height = img.height;
+
+                    if (width > height) {
+                        if (width > MAX_BOUND) { height *= MAX_BOUND / width; width = MAX_BOUND; }
+                    } else {
+                        if (height > MAX_BOUND) { width *= MAX_BOUND / height; height = MAX_BOUND; }
+                    }
+
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    const base64Result = canvas.toDataURL('image/jpeg', 0.5); 
+                    
+                    const imgEl = document.getElementById(`img_${slotId}`);
+                    const phEl = document.getElementById(`ph_${slotId}`);
+                    if (imgEl && phEl) {
+                        imgEl.src = base64Result;
+                        imgEl.style.display = "block";
+                        phEl.style.display = "none";
+                    }
+
+                    const activeId = GLOBAL_STORE.activeTabId;
+                    if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) {
+                        if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+                        if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
+                        GLOBAL_STORE.tabs[activeId].cats[slotId].img = base64Result;
+                        saveToCloud();
+                    }
                 };
                 img.src = e.target.result;
             };
             reader.readAsDataURL(file);
         }
 
+        function deleteCurrentTab() {
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            const name = GLOBAL_STORE.tabs[activeId].name || "未命名";
+            if (confirm(`⚠️ 警告：確定要徹底刪除【${name}】的所有毛孩檔案與雲端歷史紀錄嗎？`)) {
+                if (confirm(`🚨 最終安全審查：刪除後將完全無法復原，您確定要清空【${name}】嗎？`)) {
+                    delete GLOBAL_STORE.tabs[activeId];
+                    const remainingKeys = Object.keys(GLOBAL_STORE.tabs);
+                    if (remainingKeys.length > 0) {
+                        GLOBAL_STORE.activeTabId = remainingKeys[0];
+                    } else {
+                        forceResetToDefault();
+                        return;
+                    }
+                    saveToCloud();
+                    renderTabs();
+                    renderActiveContent();
+                }
+            }
+        }
+
+        function forceResetToDefault() {
+            const defaultId = "tab_" + Date.now();
+            GLOBAL_STORE = { activeTabId: defaultId, tabs: {} };
+            GLOBAL_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+            saveToCloud();
+        }
+
+        /* 🌟 核心修正：精準控制另存檔案名稱與 A4 PDF 抬頭連動 */
         function triggerPrintPDF() {
-            const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+            const activeId = GLOBAL_STORE.activeTabId;
+            const data = GLOBAL_STORE.tabs ? GLOBAL_STORE.tabs[activeId] : null;
+            if (!data) return;
             const now = new Date();
             
             const year = now.getFullYear();
+            const shortYear = String(year).slice(-2); // 提取 2026 -> 26
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const date = String(now.getDate()).padStart(2, '0');
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
+            
             const timeString = `${year}/${month}/${date} ${hours}:${minutes}`;
+            const formattedDate6Char = `${shortYear}${month}${date}`; // 精準生成 6 位數：260610
+
+            const subTitle = document.getElementById("print-sub-title");
+            const mainTitle = document.getElementById("print-main-title");
+            if (subTitle) subTitle.innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
             
-            document.getElementById("print-sub-title").innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
-            document.getElementById("print-main-title").innerText = `嘉義寵物保姆ㄌㄌ // ${data.name}點名冊`;
+            if (mainTitle) mainTitle.innerText = `嘉義寵物保姆ㄌㄌ // ${(data.name || "未命名")}點名冊`;
+
+            const originalTitle = document.title;
             
-            // 修正處：高階客製化檔名 (6位數年月日)
-            const oldT = document.title;
-            const yy = String(year).slice(-2);
-            document.title = `ㄌㄌ照護｜${yy}${month}${date}${data.name}點名板`;
-            
+            /* 🎯 密令需求 2 完美實現：ㄌㄌ照護｜260610[案場名]點名板 */
+            document.title = `ㄌㄌ照護｜${formattedDate6Char}${(data.name || "未命名")}點名板`;
+
             window.print();
-            setTimeout(() => { document.title = oldT; }, 1000);
+
+            setTimeout(() => { document.title = originalTitle; }, 1000);
         }
 
-        function deleteCurrentTab() {
-            if (confirm("⚠️ 確定要徹底刪除此案場與所有雲端歷史紀錄嗎？")) {
-                delete GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
-                const keys = Object.keys(GLOBAL_STORE.tabs);
-                if (keys.length > 0) GLOBAL_STORE.activeTabId = keys[0];
-                else forceResetToDefault();
-                saveToCloud(); renderTabs(); renderActiveContent();
+        window.addEventListener('online', () => { saveToCloud(); });
+        window.addEventListener('offline', () => {
+            const light = document.getElementById("status-light");
+            const txt = document.getElementById("status-text");
+            if (light && txt) {
+                light.className = "status-dot blue";
+                txt.innerText = "離線守護中 // 儲存於手機";
             }
-        }
-        function forceResetToDefault() { const id = "tab_" + Date.now(); GLOBAL_STORE = { activeTabId: id, tabs: {} }; GLOBAL_STORE.tabs[id] = createBlankTabData("19貓大家庭"); saveToCloud(); }
+        });
     </script>
 </body>
 </html>
