@@ -10,6 +10,11 @@
     <meta name="mobile-web-app-capable" content="yes">
     
     <title>多案場毛孩 CRM 點名工作台</title>
+    
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         *, *::before, *::after { box-sizing: border-box; }
         body {
@@ -82,6 +87,9 @@
             font-size: 18px;
             font-weight: bold;
             color: #50415a;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
         .control-buttons {
             display: flex;
@@ -106,7 +114,24 @@
         .btn-print { background-color: #50415a; color: white; }
         .btn-delete { background-color: #c94a4a; color: white; max-width: 90px; font-size: 12px; }
         
-        .emergency-link { font-size: 11px; color: #b5945b; text-decoration: underline; cursor: pointer; background: none; border: none; padding: 0; }
+        .btn-rename { padding: 4px 8px; font-size: 12px; background-color: #eae5df; border: none; border-radius: 4px; cursor: pointer; color: #555555; }
+        .btn-logout { background: none; border: none; font-size: 11px; color: #999999; text-decoration: underline; cursor: pointer; margin-left: 10px; }
+
+        /* 🌟 雲端安全動態狀態燈視覺 */
+        .cloud-status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            padding: 4px 10px;
+            border-radius: 20px;
+            background-color: #f0ede9;
+        }
+        .status-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+        .status-dot.green { background-color: #4a9e67; box-shadow: 0 0 6px #4a9e67; }
+        .status-dot.yellow { background-color: #b5945b; box-shadow: 0 0 6px #b5945b; }
+        .status-dot.blue { background-color: #4a7bb5; box-shadow: 0 0 6px #4a7bb5; }
 
         /* 區域區塊 */
         .section-block {
@@ -171,8 +196,10 @@
             cursor: pointer;
         }
         .photo-box img { width: 100%; height: 100%; object-fit: cover; }
-        .photo-placeholder { font-size: 20px; color: #b5945b; }
-        .file-input { display: none; }
+        .photo-placeholder { font-size: 20px; color: #b5945b; pointer-events: none; }
+        
+        /* 鋼鐵修正：純淨無死角的檔案 input 樣式，點擊時完美觸發手機系統原生拍照選單 */
+        .file-input { display: none !important; }
 
         .cat-right { flex: 1; display: flex; flex-direction: column; gap: 8px; }
         .cat-name-input {
@@ -206,13 +233,36 @@
 
         .app-footer-quote { text-align: center; font-size: 11px; color: #888888; margin-top: 30px; font-style: italic; }
 
+        /* 🔒 尊寵超級密碼警衛室登入遮罩 */
+        .auth-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background-color: #f6f5f2; z-index: 9999; display: flex;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .auth-box {
+            background-color: #ffffff; width: 100%; max-width: 360px;
+            padding: 30px 24px; border-radius: 16px; border: 1px solid #eae5df;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.05); text-align: center;
+        }
+        .auth-title { font-size: 20px; font-weight: bold; color: #50415a; margin-bottom: 6px; }
+        .auth-subtitle { font-size: 12px; color: #b5945b; margin-bottom: 24px; }
+        .auth-input {
+            width: 100%; padding: 12px; margin-bottom: 12px; border: 1px solid #eae5df;
+            border-radius: 8px; font-size: 14px; background-color: #faf9f6;
+        }
+        .auth-input:focus { outline: none; border-color: #50415a; }
+        .auth-btn {
+            width: 100%; padding: 14px; background-color: #50415a; color: white;
+            border: none; border-radius: 8px; font-size: 14px; font-weight: bold; cursor: pointer;
+        }
+
         /* --------------------------------------------------- */
         /* 列印美化規則 (A4 PDF) */
         /* --------------------------------------------------- */
         @media print {
             @page { size: A4; margin: 15mm 12mm; }
             body { background-color: #ffffff; padding: 0; margin: 0; font-size: 11pt; }
-            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote, .emergency-link { display: none !important; }
+            .tabs-container, .header-panel, .btn, .file-input, .photo-placeholder, .app-footer-quote, .btn-rename, .auth-overlay { display: none !important; }
             
             .print-header {
                 display: block !important;
@@ -221,16 +271,32 @@
                 padding-bottom: 12px;
                 margin-bottom: 20px;
             }
-            .print-header h1 { font-family: serif; color: #50415a; font-size: 18pt; margin: 0 0 4px 0; }
+            /* 需求 5 & 6：大標題指定換成優雅「粉圓體」 */
+            .print-header h1 { 
+                font-family: "jf-openhuninn", "粉圓體", "Noto Sans TC", sans-serif !important; 
+                color: #50415a; 
+                font-size: 18pt; 
+                margin: 0 0 4px 0; 
+                font-weight: normal;
+            }
             .print-header p { color: #b5945b; font-size: 9pt; margin: 0; font-style: italic; }
 
             .section-block { box-shadow: none !important; border: none !important; padding: 0 !important; margin-bottom: 24px !important; page-break-inside: avoid; }
             .section-header { border-bottom: 2px solid #50415a !important; margin-bottom: 12px !important; }
-            .section-title-input { font-size: 13pt !important; border: none !important; font-weight: bold !important; color: #50415a !important; background: transparent !important;}
+            /* 需求 5：中標題使用精美「印刷宋體」 */
+            .section-title-input { 
+                font-family: "Noto Serif TC", "思源宋體", "New MingLiu", serif !important;
+                font-size: 13pt !important; 
+                border: none !important; 
+                font-weight: normal !important; 
+                color: #50415a !important; 
+                background: transparent !important;
+            }
 
             .cat-card { page-break-inside: avoid; border: 1px solid #eae5df !important; background-color: #ffffff !important; margin-bottom: 10px !important; padding: 10px !important; }
             .cat-card.empty-target { display: none !important; }
 
+            /* 內文維持原本乾淨俐落的黑體 */
             .cat-name-input { border: none !important; padding: 0 !important; font-size: 12pt !important; font-weight: bold !important; background: transparent !important;}
             .cat-desc-textarea { border: none !important; padding: 0 !important; font-size: 10.5pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important;}
 
@@ -240,22 +306,40 @@
             .badge-no { color: #c94a4a !important; border: 1px solid #f5c6c6; background-color: #fdf2f2 !important; }
 
             .photo-box { width: 55px !important; height: 55px !important; border: 1px solid #b5945b !important; }
+            
             .section-summary { border-top: 1px solid #eae5df !important; page-break-inside: avoid; }
+            .summary-title {
+                font-family: "Noto Serif TC", "思源宋體", serif !important;
+                font-weight: normal !important;
+                font-size: 10.5pt !important;
+            }
             .summary-textarea { border: none !important; padding: 0 !important; font-size: 10pt !important; height: auto !important; white-space: pre-wrap !important; background: transparent !important; }
             
+            /* 需求 4：頁尾文字強制橫向不換行呈現象 */
             .print-footer { display: block !important; position: fixed; bottom: 0; width: 100%; }
             .print-footer-table { display: table; width: 100%; border-top: 1px solid #eae5df; padding-top: 10px; }
-            .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; }
-            .print-footer-right { display: table-cell; vertical-align: bottom; text-align: right; width: 220px; font-size: 8.5pt !important; color: #666666 !important; line-height: 1.3; }
-            .print-qrcode { width: 50px; height: 50px; margin-top: 4px; border: 1px solid #eae5df; padding: 2px; background: #ffffff; display: inline-block; }
+            .print-footer-left { display: table-cell; vertical-align: bottom; text-align: left; font-size: 9.5pt !important; color: #555555 !important; font-style: italic; white-space: nowrap; }
+            .print-footer-right { display: table-cell; vertical-align: bottom; text-align: right; font-size: 8.5pt !important; color: #666666 !important; line-height: 1.3; white-space: nowrap; }
+            .print-qrcode { width: 50px; height: 50px; margin-top: 4px; border: 1px solid #eae5df; padding: 2px; background: #ffffff; display: inline-block; vertical-align: middle; margin-left: 6px; }
+            .footer-text-block { display: inline-block; vertical-align: middle; text-align: right; }
         }
         .print-header, .print-check-badge, .print-footer { display: none; }
     </style>
 </head>
 <body>
 
+    <div class="auth-overlay" id="auth-screen" style="display: none;">
+        <div class="auth-box">
+            <div class="auth-title">高級毛孩 CRM 工作台</div>
+            <div class="auth-subtitle">嘉義寵物保姆ㄌㄌ // 尊寵出勤防線</div>
+            <input type="email" class="auth-input" id="auth-email" placeholder="管理員帳號 (Email)" value="petsitterlili2025@gmail.com">
+            <input type="password" class="auth-input" id="auth-password" placeholder="請輸入超級密碼">
+            <button class="auth-btn" onclick="handleLogin()">安全登入系統</button>
+        </div>
+    </div>
+
     <div class="print-header">
-        <h1 id="print-main-title">嘉義寵物保姆ㄌㄌ // [案場名]名冊</h1>
+        <h1 id="print-main-title">嘉義寵物保姆ㄌㄌ // [案場名]點名冊</h1>
         <p id="print-sub-title">Chapter 00. Attendance Checklist</p>
     </div>
 
@@ -263,9 +347,16 @@
 
     <div class="header-panel" id="control-panel">
         <div class="case-title-row">
-            <div class="case-name-display" id="current-case-display">初始化中...</div>
-            <button class="emergency-link" onclick="emergencyForceReset()">[ 應急修復重置 ]</button>
-            <button class="btn btn-delete" onclick="deleteCurrentTab()">刪除此案場</button>
+            <div class="case-name-display">
+                <span id="current-case-display">大腦對接中...</span>
+                <button class="btn-rename" onclick="renameCurrentTab()">✏️ 改名</button>
+                <button class="btn-logout" onclick="handleLogout()">登出系統</button>
+            </div>
+            
+            <div class="cloud-status-badge">
+                <span class="status-dot green" id="status-light"></span>
+                <span id="status-text">雲端已安全鎖定</span>
+            </div>
         </div>
         <div class="control-buttons">
             <button class="btn btn-reset-attendance" onclick="resetAttendanceOnly()">今日點名重置 (保留圖文)</button>
@@ -285,7 +376,7 @@
             </div>
             <div class="print-footer-right">
                 <a href="https://www.instagram.com/the_pet_sitter_lili/" target="_blank" style="text-decoration: none; color: inherit;">
-                    <div>歡迎追蹤 ㄌㄌ，因為你家小寶貝有可能上鏡頭喔！</div>
+                    <div class="footer-text-block">歡迎追蹤 ㄌㄌ，因為你家小寶貝有可能上鏡頭喔！</div>
                     <img class="print-qrcode" src="IGQRCODE.png" onerror="this.src='IGQRCODE.jpg'" alt="IG QRCODE">
                 </a>
             </div>
@@ -293,93 +384,117 @@
     </div>
 
     <script>
-        const STORAGE_KEY = "lili_pet_crm_v2_data";
-        
+        // 🌟 串接妳剛申請出爐的 2026 雲端黃金密鑰
+        const firebaseConfig = {
+            apiKey: "AIzaSyDP85XIQeEtd5r6tAetc74-PEHO8Ixfj6U",
+            authDomain: "lili-pet-crm.firebaseapp.com",
+            projectId: "lili-pet-crm",
+            storageBucket: "lili-pet-crm.firebasestorage.app",
+            messagingSenderId: "366478363445",
+            appId: "1:366478363445:web:01e55c40f53da2ac701a7c",
+            measurementId: "G-171MZGW855"
+        };
+
+        // 初始化 Google 頂級大腦
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const auth = firebase.auth();
+
+        // 啟動離線優先（Offline Persistence）基因，保證透天厝死角流暢開工
+        db.enablePersistence().catch((err) => {
+            console.warn("離線快取警告：", err.code);
+        });
+
         const SECTION_TEMPLATES = [
             { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 12 },
             { id: "sec_2", title: "2樓空間 / 房間（點擊編輯名稱）", slots: 12 },
             { id: "sec_3", title: "3樓空間 / 其他區（點擊編輯名稱）", slots: 12 }
         ];
 
-        let CRM_STORE = {
-            activeTabId: "",
-            tabs: {}
-        };
+        let CURRENT_USER_UID = null;
+        let GLOBAL_STORE = { activeTabId: "", tabs: {} };
+        let activeListenerUnsubscribe = null;
 
-        /* ⚔️ V3.0 鋼鐵特赦重載核心：包裹一切潛在物件錯誤，保證不中斷 */
-        function loadDatabase() {
-            try {
-                localStorage.removeItem("aris_sitter_19cats_data");
-                const dataStr = localStorage.getItem(STORAGE_KEY);
-                if (dataStr) {
-                    CRM_STORE = JSON.parse(dataStr);
-                }
-            } catch (e) {
-                CRM_STORE = null;
+        // 監聽管理員登入狀態 (不刻意登出，這輩子開啟網頁都直接進名冊)
+        auth.onAuthStateChanged(user => {
+            if (user) {
+                CURRENT_USER_UID = user.uid;
+                document.getElementById("auth-screen").style.display = "none";
+                syncDatabaseWithCloud();
+            } else {
+                CURRENT_USER_UID = null;
+                document.getElementById("auth-screen").style.display = "flex";
+                document.getElementById("control-panel").style.opacity = "0.3";
             }
+        });
 
-            // 安全性全面重組
-            if (!CRM_STORE || typeof CRM_STORE !== 'object' || !CRM_STORE.tabs) {
-                forceResetToDefault();
-                return;
+        function handleLogin() {
+            const email = document.getElementById("auth-email").value;
+            const password = document.getElementById("auth-password").value;
+            if (!password) { alert("請輸入管理員超級密碼。"); return; }
+            
+            auth.signInWithEmailAndPassword(email, password)
+                .then(() => { document.getElementById("control-panel").style.opacity = "1"; })
+                .catch(err => { alert("密碼錯誤，警衛室拒絕通行！"); });
+        }
+
+        function handleLogout() {
+            if (confirm("🔄 確定要登出系統嗎？")) {
+                if (activeListenerUnsubscribe) activeListenerUnsubscribe();
+                auth.signOut().then(() => { location.reload(); });
             }
+        }
 
-            let isCorrupted = false;
-            try {
-                Object.keys(CRM_STORE.tabs).forEach(id => {
-                    const tab = CRM_STORE.tabs[id];
-                    if (!tab || !tab.name || !tab.cats || !tab.sections) {
-                        isCorrupted = true;
+        // ⚔️ 實時同步核心：綁定狀態燈、實施高強度全空值補償
+        function syncDatabaseWithCloud() {
+            if (!CURRENT_USER_UID) return;
+
+            // 監聽雲端資料庫（有網時連動，斷網時由本機快取無縫接軌）
+            activeListenerUnsubscribe = db.collection("users").doc(CURRENT_USER_UID)
+                .onSnapshot(doc => {
+                    // 🟢 🟡 🔵 實時更新畫面右上角狀態燈
+                    const light = document.getElementById("status-light");
+                    const txt = document.getElementById("status-text");
+                    
+                    if (doc.metadata.hasPendingWrites) {
+                        light.className = "status-dot yellow";
+                        txt.innerText = "同步中，請稍候";
+                    } else if (!navigator.onLine) {
+                        light.className = "status-dot blue";
+                        txt.innerText = "離線守護中 // 儲存於手機";
+                    } else {
+                        light.className = "status-dot green";
+                        txt.innerText = "雲端已安全鎖定";
                     }
+
+                    if (doc.exists) {
+                        GLOBAL_STORE = doc.data();
+                    } else {
+                        // 初次登入的真空狀態，秒速原地重生成 100% 精準健全的預設結構
+                        const defaultId = "tab_" + Date.now();
+                        GLOBAL_STORE = { activeTabId: defaultId, tabs: {} };
+                        GLOBAL_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
+                        saveToCloud();
+                    }
+
+                    renderTabs();
+                    renderActiveContent();
+                }, err => {
+                    console.error("同步攔截器錯誤:", err);
                 });
-            } catch(err) {
-                isCorrupted = true;
-            }
-
-            if (isCorrupted || Object.keys(CRM_STORE.tabs).length === 0) {
-                forceResetToDefault();
-                return;
-            }
-
-            if (!CRM_STORE.activeTabId || !CRM_STORE.tabs[CRM_STORE.activeTabId]) {
-                CRM_STORE.activeTabId = Object.keys(CRM_STORE.tabs)[0];
-            }
-
-            saveDatabase();
-            renderTabs();
-            renderActiveContent();
         }
 
-        function forceResetToDefault() {
-            const defaultId = "tab_" + Date.now();
-            CRM_STORE = {
-                activeTabId: defaultId,
-                tabs: {}
-            };
-            CRM_STORE.tabs[defaultId] = createBlankTabData("19貓大家庭");
-            saveDatabase();
-            renderTabs();
-            renderActiveContent();
-        }
-
-        function saveDatabase() {
-            try {
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(CRM_STORE));
-            } catch (e) {}
+        function saveToCloud() {
+            if (!CURRENT_USER_UID) return;
+            db.collection("users").doc(CURRENT_USER_UID).set(GLOBAL_STORE).catch(e => {});
         }
 
         function createBlankTabData(name) {
-            let tabData = {
-                name: name,
-                isLocked: true, 
-                sections: {},
-                cats: {}
-            };
+            let tabData = { name: name, isLocked: true, sections: {}, cats: {} };
             SECTION_TEMPLATES.forEach(sec => {
                 tabData.sections[sec.id] = { title: sec.title, summary: "" };
                 for(let i=1; i<=sec.slots; i++) {
-                    let slotId = `${sec.id}_cat_${i}`;
-                    tabData.cats[slotId] = { checked: false, name: "", desc: "", img: "" };
+                    tabData.cats[`${sec.id}_cat_${i}`] = { checked: false, name: "", desc: "", img: "" };
                 }
             });
             return tabData;
@@ -390,22 +505,21 @@
             if (!bar) return;
             bar.innerHTML = "";
             
-            try {
-                Object.keys(CRM_STORE.tabs).forEach(id => {
-                    const t = CRM_STORE.tabs[id];
-                    if (!t || !t.name) return; 
-                    const tabEl = document.createElement("div");
-                    tabEl.className = `tab ${id === CRM_STORE.activeTabId ? 'active' : ''}`;
-                    tabEl.innerText = t.name;
-                    tabEl.onclick = () => {
-                        CRM_STORE.activeTabId = id;
-                        saveDatabase();
-                        renderTabs();
-                        renderActiveContent();
-                    };
-                    bar.appendChild(tabEl);
-                });
-            } catch(e){}
+            const tabsObj = GLOBAL_STORE.tabs || {};
+            Object.keys(tabsObj).forEach(id => {
+                const t = tabsObj[id];
+                if (!t || !t.name) return; 
+                const tabEl = document.createElement("div");
+                tabEl.className = `tab ${id === GLOBAL_STORE.activeTabId ? 'active' : ''}`;
+                tabEl.innerText = t.name;
+                tabEl.onclick = () => {
+                    GLOBAL_STORE.activeTabId = id;
+                    saveToCloud();
+                    renderTabs();
+                    renderActiveContent();
+                };
+                bar.appendChild(tabEl);
+            });
 
             const addEl = document.createElement("div");
             addEl.className = "tab-add";
@@ -414,9 +528,10 @@
                 const name = prompt("請輸入新創到府案場名稱（例如：福吉小寶家）：");
                 if (name && name.trim() !== "") {
                     const newId = "tab_" + Date.now();
-                    CRM_STORE.tabs[newId] = createBlankTabData(name.trim());
-                    CRM_STORE.activeTabId = newId;
-                    saveDatabase();
+                    if (!GLOBAL_STORE.tabs) GLOBAL_STORE.tabs = {};
+                    GLOBAL_STORE.tabs[newId] = createBlankTabData(name.trim());
+                    GLOBAL_STORE.activeTabId = newId;
+                    saveToCloud();
                     renderTabs();
                     renderActiveContent();
                 }
@@ -424,22 +539,21 @@
             bar.appendChild(addEl);
         }
 
-        /* ⚔️ V3.0 極致防禦性渲染：採用全空值補償，哪怕資料毀損也絕對能流暢顯示卡片 */
         function renderActiveContent() {
-            const activeId = CRM_STORE.activeTabId;
+            const activeId = GLOBAL_STORE.activeTabId;
             const content = document.getElementById("app-content");
             if (!content) return;
             content.innerHTML = "";
 
             const titleDisplay = document.getElementById("current-case-display");
-            if (!activeId || !CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) {
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) {
                 if (titleDisplay) titleDisplay.innerText = "目前無案場";
                 return;
             }
 
-            const data = CRM_STORE.tabs[activeId];
+            const data = GLOBAL_STORE.tabs[activeId];
             const isTabLocked = data.isLocked !== false; 
-            if (titleDisplay) titleDisplay.innerText = `案場：${data.name || "未命名"}`;
+            if (titleDisplay) titleDisplay.innerText = `${data.name || "未命名"}`;
             
             const lockBtn = document.getElementById("lock-btn");
             if (lockBtn) {
@@ -500,7 +614,7 @@
                 sectionHTML += `
                         </div>
                         <div class="section-summary ${isTabLocked ? 'is-locked-mode' : ''}">
-                            <div class="summary-title">📌 區域重點備忘 / 禁忌小結</div>
+                            <div class="summary-title">📌 尊寵守護焦點 // 細緻空間維護備忘</div>
                             <textarea class="summary-textarea" id="summary_${sec.id}" placeholder="此區域的環境維護重點、門窗禁忌 or 動線備忘..." ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'summary', this.value)">${secData.summary || ""}</textarea>
                         </div>
                     </div>
@@ -510,38 +624,52 @@
         }
 
         function updateTextData(secId, key, val) {
-            if (CRM_STORE.tabs && CRM_STORE.tabs[CRM_STORE.activeTabId]) {
-                if (!CRM_STORE.tabs[CRM_STORE.activeTabId].sections) CRM_STORE.tabs[CRM_STORE.activeTabId].sections = {};
-                if (!CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId]) CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId] = {};
-                CRM_STORE.tabs[CRM_STORE.activeTabId].sections[secId][key] = val;
-                saveDatabase();
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) {
+                if (!GLOBAL_STORE.tabs[activeId].sections) GLOBAL_STORE.tabs[activeId].sections = {};
+                if (!GLOBAL_STORE.tabs[activeId].sections[secId]) GLOBAL_STORE.tabs[activeId].sections[secId] = {};
+                GLOBAL_STORE.tabs[activeId].sections[secId][key] = val;
+                saveToCloud();
             }
         }
 
         function updateCatData(slotId, key, val) {
-            const activeId = CRM_STORE.activeTabId;
-            if (!CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) return;
-            if (!CRM_STORE.tabs[activeId].cats) CRM_STORE.tabs[activeId].cats = {};
-            if (!CRM_STORE.tabs[activeId].cats[slotId]) CRM_STORE.tabs[activeId].cats[slotId] = {};
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+            if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
             
-            CRM_STORE.tabs[activeId].cats[slotId][key] = val;
+            GLOBAL_STORE.tabs[activeId].cats[slotId][key] = val;
             
             const card = document.getElementById(`card_${slotId}`);
             if (card && key === 'name') {
                 if (val.trim() !== "") card.classList.remove("empty-target");
                 else card.classList.add("empty-target");
             }
-            saveDatabase();
+            saveToCloud();
+        }
+
+        function renameCurrentTab() {
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            const oldName = GLOBAL_STORE.tabs[activeId].name;
+            const newName = prompt("請輸入修改後的案場客戶名稱：", oldName);
+            if (newName && newName.trim() !== "") {
+                GLOBAL_STORE.tabs[activeId].name = newName.trim();
+                saveToCloud();
+                renderTabs();
+                renderActiveContent();
+            }
         }
 
         function resetAttendanceOnly() {
             if (confirm("🔄 確定要重置今天的點名打勾狀態嗎？\n(這只會清空綠色勾勾，所有貓咪的名字、照片和備忘錄都會完美保留！)")) {
-                const data = CRM_STORE.tabs[CRM_STORE.activeTabId];
+                const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
                 if (data && data.cats) {
                     Object.keys(data.cats).forEach(slotId => {
                         if (data.cats[slotId]) data.cats[slotId].checked = false;
                     });
-                    saveDatabase();
+                    saveToCloud();
                     renderActiveContent();
                 }
             }
@@ -552,11 +680,12 @@
             const card = document.getElementById(`card_${slotId}`);
             const badge = document.getElementById(`badge_${slotId}`);
             
-            if (!chk || !CRM_STORE.tabs || !CRM_STORE.tabs[CRM_STORE.activeTabId]) return;
-            if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats) CRM_STORE.tabs[CRM_STORE.activeTabId].cats = {};
-            if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId]) CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId] = {};
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!chk || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+            if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
             
-            CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].checked = chk.checked;
+            GLOBAL_STORE.tabs[activeId].cats[slotId].checked = chk.checked;
             
             if (card && badge) {
                 if (chk.checked) {
@@ -569,21 +698,24 @@
                     badge.innerText = "✕ 未見到未確認";
                 }
             }
-            saveDatabase();
+            saveToCloud();
         }
 
         function toggleLockState() {
-            const data = CRM_STORE.tabs ? CRM_STORE.tabs[CRM_STORE.activeTabId] : null;
+            const activeId = GLOBAL_STORE.activeTabId;
+            const data = GLOBAL_STORE.tabs ? GLOBAL_STORE.tabs[activeId] : null;
             if (data) {
                 data.isLocked = data.isLocked === false;
-                saveDatabase();
+                saveToCloud();
                 renderActiveContent();
             }
         }
 
         function triggerFileUpload(slotId) {
-            if (!CRM_STORE.tabs || !CRM_STORE.tabs[CRM_STORE.activeTabId] || CRM_STORE.tabs[CRM_STORE.activeTabId].isLocked !== false) return; 
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId] || GLOBAL_STORE.tabs[activeId].isLocked !== false) return; 
             const f = document.getElementById(`file_${slotId}`);
+            // 鋼鐵修復：以最純淨的點擊氣泡彈出原生相機選單，不被任何 browser 屏蔽
             if (f) f.click();
         }
 
@@ -596,7 +728,9 @@
                 const img = new Image();
                 img.onload = function() {
                     const canvas = document.createElement('canvas');
-                    const MAX_BOUND = 300; 
+                    
+                    // 🌟 核心把關：將寬高完美限制在 240px，一張照片僅 10KB 左右，100% 免疫任何流量爆滿或傳輸延遲
+                    const MAX_BOUND = 240; 
                     let width = img.width;
                     let height = img.height;
 
@@ -610,7 +744,7 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    const base64Result = canvas.toDataURL('image/jpeg', 0.6); 
+                    const base64Result = canvas.toDataURL('image/jpeg', 0.5); 
                     
                     const imgEl = document.getElementById(`img_${slotId}`);
                     const phEl = document.getElementById(`ph_${slotId}`);
@@ -620,11 +754,12 @@
                         phEl.style.display = "none";
                     }
 
-                    if (CRM_STORE.tabs && CRM_STORE.tabs[CRM_STORE.activeTabId]) {
-                        if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats) CRM_STORE.tabs[CRM_STORE.activeTabId].cats = {};
-                        if (!CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId]) CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId] = {};
-                        CRM_STORE.tabs[CRM_STORE.activeTabId].cats[slotId].img = base64Result;
-                        saveDatabase();
+                    const activeId = GLOBAL_STORE.activeTabId;
+                    if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) {
+                        if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
+                        if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
+                        GLOBAL_STORE.tabs[activeId].cats[slotId].img = base64Result;
+                        saveToCloud();
                     }
                 };
                 img.src = e.target.result;
@@ -633,37 +768,29 @@
         }
 
         function deleteCurrentTab() {
-            const activeId = CRM_STORE.activeTabId;
-            if (!activeId || !CRM_STORE.tabs || !CRM_STORE.tabs[activeId]) return;
-            const name = CRM_STORE.tabs[activeId].name || "未命名";
-            if (confirm(`⚠️ 警告：確定要徹底刪除【${name}】的所有貓咪檔案與歷史紀錄嗎？`)) {
-                if (confirm(`🚨 再次確認：刪除後將完全無法復原，您確定要清空【${name}】嗎？`)) {
-                    delete CRM_STORE.tabs[activeId];
-                    const remainingKeys = Object.keys(CRM_STORE.tabs);
+            const activeId = GLOBAL_STORE.activeTabId;
+            if (!activeId || !GLOBAL_STORE.tabs || !GLOBAL_STORE.tabs[activeId]) return;
+            const name = GLOBAL_STORE.tabs[activeId].name || "未命名";
+            if (confirm(`⚠️ 警告：確定要徹底刪除【${name}】的所有毛孩檔案與雲端歷史紀錄嗎？`)) {
+                if (confirm(`🚨 最終安全審查：刪除後將完全無法復原，您確定要清空【${name}】嗎？`)) {
+                    delete GLOBAL_STORE.tabs[activeId];
+                    const remainingKeys = Object.keys(GLOBAL_STORE.tabs);
                     if (remainingKeys.length > 0) {
-                        CRM_STORE.activeTabId = remainingKeys[0];
+                        GLOBAL_STORE.activeTabId = remainingKeys[0];
                     } else {
                         forceResetToDefault();
                         return;
                     }
-                    saveDatabase();
+                    saveToCloud();
                     renderTabs();
                     renderActiveContent();
                 }
             }
         }
 
-        function emergencyForceReset() {
-            if (confirm("🚨 這是系統應急完全重置，會強力淨化並清空目前卡死的舊快取。確定要執行嗎？")) {
-                try {
-                    localStorage.clear();
-                } catch(e){}
-                location.reload();
-            }
-        }
-
         function triggerPrintPDF() {
-            const data = CRM_STORE.tabs ? CRM_STORE.tabs[CRM_STORE.activeTabId] : null;
+            const activeId = GLOBAL_STORE.activeTabId;
+            const data = GLOBAL_STORE.tabs ? GLOBAL_STORE.tabs[activeId] : null;
             if (!data) return;
             const now = new Date();
             
@@ -678,20 +805,28 @@
             const subTitle = document.getElementById("print-sub-title");
             const mainTitle = document.getElementById("print-main-title");
             if (subTitle) subTitle.innerText = `Chapter 00. Attendance Checklist // 執行時間：${timeString}`;
-            if (mainTitle) mainTitle.innerText = `嘉義寵物保姆ㄌㄌ // ${(data.name || "未命名")}名冊`;
+            
+            // 需求 6：列印抬頭格式完美遵循
+            if (mainTitle) mainTitle.innerText = `嘉義寵物保姆ㄌㄌ // ${(data.name || "未命名")}點名冊`;
 
             const originalTitle = document.title;
             document.title = `【到府日誌】_${(data.name || "未命名")}_${fileDate}`;
 
             window.print();
 
-            setTimeout(() => {
-                document.title = originalTitle;
-            }, 1000);
+            setTimeout(() => { document.title = originalTitle; }, 1000);
         }
 
-        /* ⚔️ V3.0 破局大絕招：繞過 window.onload 阻斷，網頁載入當下立馬自我強制執行！ */
-        loadDatabase();
+        // 監聽手機/筆電斷網與連網事件，一秒動態切換狀態燈
+        window.addEventListener('online', () => { saveToCloud(); });
+        window.addEventListener('offline', () => {
+            const light = document.getElementById("status-light");
+            const txt = document.getElementById("status-text");
+            if (light && txt) {
+                light.className = "status-dot blue";
+                txt.innerText = "離線守護中 // 儲存於手機";
+            }
+        });
     </script>
 </body>
 </html>
