@@ -1,0 +1,23 @@
+{
+  "short_name": "ㄌㄌ多寵點名板",
+  "name": "ㄌㄌ多寵點名板 // CRM 點名工作台",
+  "icons": [
+    {
+      "src": "cat_striped.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "cat_striped.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ],
+  "start_url": "index.html",
+  "background_color": "#f6f5f2",
+  "theme_color": "#50415a",
+  "display": "standalone",
+  "orientation": "portrait"
+}
