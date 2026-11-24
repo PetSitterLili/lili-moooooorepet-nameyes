@@ -448,6 +448,17 @@
         .frame-actions { display:flex; justify-content:flex-end; gap:12px; }
         .frame-actions button { padding:12px 16px; border:1px solid #d8d0df; border-radius:10px; font-size:16px; background:white; color:#50415a; }
         @media print { #frame-editor,#shared-photo-input {display:none!important;} }
+    
+        #photo-picker-dialog { width:min(92vw,420px); max-height:90dvh; overflow:auto; border:0; border-radius:20px; padding:20px; color:#50415a; }
+        #photo-picker-dialog::backdrop { background:#0009; }
+        #photo-picker-dialog p { font-size:16px; line-height:1.7; }
+        .photo-dialog-header { position:sticky; top:-20px; z-index:2; display:flex; align-items:center; justify-content:space-between; gap:10px; background:white; padding:8px 0; }
+        .photo-dialog-header h2 { font-size:20px; margin:0!important; }
+        .photo-dialog-header button,.photo-picker-actions button { border:1px solid #d8d0df; border-radius:10px; padding:12px 14px; background:white; color:#50415a; font-size:16px; cursor:pointer; flex-shrink:0; }
+        .photo-picker-actions { display:flex; flex-direction:column; gap:12px; margin-top:20px; }
+        .photo-picker-actions button:first-child { color:white; background:#50415a; }
+        #frame-editor { max-height:90dvh; overflow:auto; }
+        @media print { #photo-picker-dialog { display:none!important; } }
     </style>
 </head>
 <body>
@@ -494,8 +505,14 @@
     <div id="app-content"></div>
     <div id="photo-work" hidden role="status" aria-live="polite"><div><strong id="photo-work-label">照片整理中</strong><p>請稍候，完成儲存後才會切換照片。</p></div></div>
     <input id="shared-photo-input" type="file" accept="image/*" hidden>
+    <dialog id="photo-picker-dialog" aria-labelledby="photo-picker-title">
+        <header class="photo-dialog-header"><h2 id="photo-picker-title">選擇毛寶照片</h2><button type="button" onclick="cancelPhotoPicker()" aria-label="取消選圖，返回點名板">關閉 ✕</button></header>
+        <p id="photo-picker-note" role="status"></p>
+        <p>進入手機選圖畫面後，若沒有合適的照片，可用手機返回鍵或返回手勢退出。</p>
+        <div class="photo-picker-actions"><button type="button" onclick="launchPhotoPicker()">選擇照片</button><button type="button" onclick="cancelPhotoPicker()">取消，返回點名板</button></div>
+    </dialog>
     <dialog id="frame-editor" aria-label="調整大頭貼取景">
-        <h2>調整大頭貼取景</h2><p>拖曳照片調整位置，用下方滑桿放大。點開大頭貼時仍會顯示完整照片。</p>
+        <header class="photo-dialog-header"><h2>調整大頭貼取景</h2><button type="button" onclick="document.getElementById('frame-editor').close()">返回 ✕</button></header><p>拖曳照片調整位置，用下方滑桿放大。點開大頭貼時仍會顯示完整照片。</p>
         <div id="frame-box"><img id="frame-image" alt="取景預覽" draggable="false"></div>
         <label>放大倍率 <input id="frame-zoom" type="range" min="1" max="3" step="0.01" value="1"></label>
         <div class="frame-actions"><button type="button" onclick="document.getElementById('frame-editor').close()">取消</button><button type="button" onclick="savePhotoFrame()">儲存取景</button></div>
@@ -922,33 +939,88 @@
             return 'object-position:'+f.x+'% '+f.y+'%;transform:scale('+f.zoom+');transform-origin:'+f.x+'% '+f.y+'%;';
         }
         let photoPickTarget=null;
-        async function choosePhoto(slotId) {
+        let systemPhotoPickerOpen=false;
+        let fallbackPhotoPicker=false;
+        function choosePhoto(slotId) {
             const tabId=GLOBAL_STORE.activeTabId;
-            if (GLOBAL_STORE.tabs?.[tabId]?.isLocked !== false) return;
-            const target={slotId,tabId,userUid:CURRENT_USER_UID};
-            photoPickTarget=target;
+            if (GLOBAL_STORE.tabs?.[tabId]?.isLocked !== false || photoWorkBusy) return;
+            cancelPhotoPicker();
+            photoPickTarget={slotId,tabId,userUid:CURRENT_USER_UID,cancelled:false};
             photoPickInProgress=true;
-            if (typeof window.showOpenFilePicker === 'function') {
+            document.getElementById('photo-picker-note').textContent='沒有適合的照片也沒關係，可以隨時取消。';
+            document.getElementById('photo-picker-dialog').showModal();
+        }
+        function cancelPhotoPicker() {
+            if(photoPickTarget) photoPickTarget.cancelled=true;
+            photoPickTarget=null;
+            photoPickInProgress=false;
+            systemPhotoPickerOpen=false;
+            fallbackPhotoPicker=false;
+            document.getElementById('shared-photo-input').value='';
+            const dialog=document.getElementById('photo-picker-dialog');
+            if(dialog.open) dialog.close();
+            setTimeout(maybeMigratePhotos,0);
+        }
+        function returnedWithoutPhoto(target) {
+            if(photoPickTarget!==target || target?.cancelled) return;
+            systemPhotoPickerOpen=false;
+            fallbackPhotoPicker=false;
+            document.getElementById('photo-picker-note').textContent='沒有選擇照片，原本照片未變更。可以重新選擇，或按「取消，返回點名板」。';
+        }
+        async function acceptChosenPhoto(file,target) {
+            if(!file || !target || target.cancelled || photoPickTarget!==target) return;
+            photoPickTarget=null;
+            systemPhotoPickerOpen=false;
+            fallbackPhotoPicker=false;
+            document.getElementById('photo-picker-dialog').close();
+            await compressPhoto({target:{files:[file],value:''}},target.slotId,target);
+        }
+        async function launchPhotoPicker() {
+            const target=photoPickTarget;
+            if(!target || target.cancelled || systemPhotoPickerOpen) return;
+            systemPhotoPickerOpen=true;
+            if(typeof window.showOpenFilePicker==='function') {
                 try {
                     const [handle]=await window.showOpenFilePicker({id:'lili-pet-photos',multiple:false,types:[{description:'照片',accept:{'image/*':['.jpg','.jpeg','.png','.webp','.heic']}}]});
                     const file=await handle.getFile();
-                    await compressPhoto({target:{files:[file],value:''}},slotId,target);
+                    await acceptChosenPhoto(file,target);
                     return;
                 } catch(error) {
-                    if(error.name==='AbortError') { photoPickInProgress=false; setTimeout(maybeMigratePhotos,0); return; }
+                    if(target.cancelled || photoPickTarget!==target) return;
+                    if(error.name==='AbortError') { returnedWithoutPhoto(target); return; }
                 }
             }
+            if(target.cancelled || photoPickTarget!==target) return;
+            fallbackPhotoPicker=true;
             const input=document.getElementById('shared-photo-input');
             input.value='';
-            input.click();
+            try { input.click(); }
+            catch(error) { returnedWithoutPhoto(target); }
         }
         document.getElementById('shared-photo-input').addEventListener('change',event=>{
             const target=photoPickTarget;
-            if(target) compressPhoto(event,target.slotId,target);
+            const file=event.target.files[0];
+            event.target.value='';
+            if(file) acceptChosenPhoto(file,target);
+            else returnedWithoutPhoto(target);
         });
         document.getElementById('shared-photo-input').addEventListener('cancel',()=>{
-            photoPickInProgress=false;
-            maybeMigratePhotos();
+            returnedWithoutPhoto(photoPickTarget);
+        });
+        document.getElementById('photo-picker-dialog').addEventListener('close',()=>{
+            if(photoPickTarget) cancelPhotoPicker();
+        });
+        document.getElementById('photo-picker-dialog').addEventListener('cancel',event=>{
+            event.preventDefault();
+            cancelPhotoPicker();
+        });
+        window.addEventListener('focus',()=>{
+            const target=photoPickTarget;
+            if(!fallbackPhotoPicker || !systemPhotoPickerOpen || !target) return;
+            setTimeout(()=>{
+                if(fallbackPhotoPicker && systemPhotoPickerOpen && photoPickTarget===target &&
+                    !document.getElementById('shared-photo-input').files.length) returnedWithoutPhoto(target);
+            },600);
         });
         let frameEdit=null, framePointer=null;
         async function editPhotoFrame(slotId) {
