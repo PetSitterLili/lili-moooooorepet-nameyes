@@ -922,6 +922,7 @@
             return 'object-position:'+f.x+'% '+f.y+'%;transform:scale('+f.zoom+');transform-origin:'+f.x+'% '+f.y+'%;';
         }
         let photoPickTarget=null;
+        let lastPhotoLocation=null;
         async function choosePhoto(slotId) {
             const tabId=GLOBAL_STORE.activeTabId;
             if (GLOBAL_STORE.tabs?.[tabId]?.isLocked !== false) return;
@@ -930,8 +931,13 @@
             photoPickInProgress=true;
             if (typeof window.showOpenFilePicker === 'function') {
                 try {
-                    const [handle]=await window.showOpenFilePicker({id:'lili-pet-photos',multiple:false,types:[{description:'照片',accept:{'image/*':['.jpg','.jpeg','.png','.webp','.heic']}}]});
+                    const pickerOptions={id:'lili-pet-photos',multiple:false,types:[{description:'照片',accept:{'image/*':['.jpg','.jpeg','.png','.webp','.heic']}}]};
+                    // Keep the last confirmed file's parent directory, even after a later picker is cancelled.
+                    if(lastPhotoLocation?.userUid===target.userUid) pickerOptions.startIn=lastPhotoLocation.handle;
+                    const [handle]=await window.showOpenFilePicker(pickerOptions);
                     const file=await handle.getFile();
+                    if(CURRENT_USER_UID!==target.userUid) { photoPickInProgress=false; return; }
+                    lastPhotoLocation={userUid:target.userUid,handle};
                     await compressPhoto({target:{files:[file],value:''}},slotId,target);
                     return;
                 } catch(error) {
