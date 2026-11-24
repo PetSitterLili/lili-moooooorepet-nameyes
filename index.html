@@ -420,6 +420,16 @@
         .drop-marker { height:8px; border-radius:6px; background:#9b89b3; margin:8px 0; }
         .move-help { font-size:14px; color:#64566f; margin:0 0 12px; }
         @media print { .card-tools,.photo-delete,.move-help,.drag-floating,.drop-marker { display:none!important; } }
+    
+        .photo-change { position:relative; overflow:hidden; display:inline-block; padding:8px 10px; border:1px solid #d8d0df; border-radius:8px; background:white; color:#50415a; font-size:14px; cursor:pointer; }
+        .photo-box[role="button"], .is-locked-mode .photo-box[role="button"] { cursor:zoom-in; }
+        .photo-viewer { position:fixed; inset:0; margin:0; width:100vw; height:100dvh; max-width:none; max-height:none; border:0; padding:0; background:#111; color:white; }
+        .photo-viewer::backdrop { background:#111; }
+        .photo-viewer[open] { display:flex; flex-direction:column; }
+        .photo-viewer header { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:16px; padding-top:max(16px,env(safe-area-inset-top)); }
+        .photo-viewer button { border:1px solid #888; border-radius:10px; background:#333; color:white; padding:12px 18px; font-size:16px; cursor:pointer; }
+        .photo-viewer img { display:block; flex:1; min-height:0; width:100%; object-fit:contain; padding:0 12px 20px; }
+        @media print { .photo-change,.photo-viewer { display:none!important; } }
     </style>
 </head>
 <body>
@@ -463,6 +473,10 @@
     </div>
 
     <div id="app-content"></div>
+    <dialog id="photo-viewer" class="photo-viewer" aria-label="毛寶照片放大檢視">
+        <header><span id="photo-viewer-name"></span><button type="button" onclick="document.getElementById('photo-viewer').close()">關閉 ✕</button></header>
+        <img id="photo-viewer-image" alt="">
+    </dialog>
 
     <div class="app-footer-quote">「多毛孩的家庭，需要加倍溫柔的眼睛；我們用最細緻的看顧，安放您的每一份牽掛。」</div>
     
@@ -499,9 +513,9 @@
         db.enablePersistence().catch((err) => { console.warn("離線快取生效：", err.code); });
 
         const SECTION_TEMPLATES = [
-            { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 12 },
-            { id: "sec_2", title: "2樓空間 / 房間（點擊編輯名稱）", slots: 12 },
-            { id: "sec_3", title: "3樓空間 / 其他區（點擊編輯名稱）", slots: 12 }
+            { id: "sec_1", title: "1樓空間 / 貓房（點擊編輯名稱）", slots: 15 },
+            { id: "sec_2", title: "2樓空間 / 房間（點擊編輯名稱）", slots: 15 },
+            { id: "sec_3", title: "3樓空間 / 其他區（點擊編輯名稱）", slots: 15 }
         ];
 
         let CURRENT_USER_UID = null;
@@ -648,12 +662,13 @@
                                 <div class="cat-left">
                                     <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
                                     <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
-                                    <div class="photo-box">
+                                    <div class="photo-box" ${hasImg ? `role="button" tabindex="0" aria-label="放大照片" onclick="openPhotoViewer('${slotId}', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhotoViewer('${slotId}', this)}"` : ''}>
                                         <img id="img_${slotId}" src="${cat.img || ''}" style="display:${hasImg ? 'block' : 'none'};">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
-                                        <input type="file" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
+                                        ${!hasImg && !isTabLocked ? `<input type="file" accept="image/*" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')">` : ''}
+
                                     </div>
-                                    ${hasImg && !isTabLocked ? `<button type="button" class="photo-delete" onclick="deletePhoto('${slotId}')">刪除照片</button>` : ''}
+                                    ${hasImg && !isTabLocked ? `<label class="photo-change">更換照片<input type="file" accept="image/*" class="native-file-overlay" onchange="compressPhoto(event, '${slotId}')"></label><button type="button" class="photo-delete" onclick="deletePhoto('${slotId}')">刪除照片</button>` : ''}
                                 </div>
                                 <div class="cat-right">
                                     <input type="text" class="cat-name-input" id="name_${slotId}" value="${cat.name || ''}" placeholder="輸入毛孩名字" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
@@ -677,6 +692,13 @@
 
 
         function ensureCardOrder(data) {
+            if (!data.cats) data.cats = {};
+            SECTION_TEMPLATES.forEach(sec => {
+                for (let i=1; i<=sec.slots; i++) {
+                    const id = sec.id + '_cat_' + i;
+                    if (!data.cats[id]) data.cats[id] = { checked:false, name:'', desc:'', img:'' };
+                }
+            });
             const seen = new Set();
             const order = {};
             SECTION_TEMPLATES.forEach(sec => {
@@ -699,6 +721,21 @@
             });
             data.cardOrder = order;
         }
+
+        function openPhotoViewer(slotId, trigger) {
+            const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+            const cat = data?.cats?.[slotId];
+            if (!cat?.img || cardDrag?.started) return;
+            const viewer = document.getElementById('photo-viewer');
+            const image = document.getElementById('photo-viewer-image');
+            image.src = cat.img;
+            image.alt = cat.name || '毛寶照片';
+            document.getElementById('photo-viewer-name').textContent = cat.name || '毛寶照片';
+            viewer.showModal();
+        }
+        document.getElementById('photo-viewer').addEventListener('close', () => {
+            document.getElementById('photo-viewer-image').removeAttribute('src');
+        });
 
         function deletePhoto(slotId) {
             const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
@@ -750,7 +787,7 @@
         document.addEventListener('pointerdown', event => {
             if (cardDrag || event.button !== 0) return;
             const card = event.target.closest('.cat-card');
-            if (!card || event.target.closest('input,textarea,.photo-box,.photo-delete')) return;
+            if (!card || event.target.closest('input,textarea,.photo-box,.photo-delete,.photo-change')) return;
             const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
             if (!data || data.isLocked !== false) return;
             const rect = card.getBoundingClientRect();
