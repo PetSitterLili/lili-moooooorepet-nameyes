@@ -431,6 +431,13 @@
         .photo-viewer img { display:block; flex:1; min-height:0; width:100%; object-fit:contain; padding:0 12px 20px; }
         @media print { .photo-change,.photo-viewer { display:none!important; } }
     
+        #photo-work[hidden], #photo-storage-notice[hidden] { display:none; }
+        #photo-work { position:fixed; inset:0; z-index:20000; background:#21192ccc; display:flex; align-items:center; justify-content:center; padding:24px; }
+        #photo-work > div { background:white; border-radius:18px; padding:24px; max-width:360px; color:#50415a; }
+        #photo-storage-notice { background:#fff3df; border-radius:12px; padding:16px; margin:12px 0; font-size:14px; }
+        #photo-storage-notice button { padding:10px 14px; margin-top:8px; border:1px solid #c5b5d3; border-radius:8px; background:white; color:#50415a; font-size:14px; }
+        #photo-viewer-note { margin:0; padding:0 16px; color:#ddd; font-size:14px; }
+        @media print { #photo-work,#photo-storage-notice { display:none!important; } }
         #frame-editor { width:min(92vw,420px); border:0; border-radius:20px; padding:24px; color:#50415a; }
         #frame-editor::backdrop { background:#0009; }
         #frame-editor h2 { font-size:20px; margin-top:0; }
@@ -483,7 +490,9 @@
         </div>
     </div>
 
+    <div id="photo-storage-notice" hidden><span id="photo-storage-message"></span> <button type="button" onclick="retryPhotoMigration()">重試整理照片</button></div>
     <div id="app-content"></div>
+    <div id="photo-work" hidden role="status" aria-live="polite"><div><strong id="photo-work-label">照片整理中</strong><p>請稍候，完成儲存後才會切換照片。</p></div></div>
     <input id="shared-photo-input" type="file" accept="image/*" hidden>
     <dialog id="frame-editor" aria-label="調整大頭貼取景">
         <h2>調整大頭貼取景</h2><p>拖曳照片調整位置，用下方滑桿放大。點開大頭貼時仍會顯示完整照片。</p>
@@ -493,6 +502,7 @@
     </dialog>
     <dialog id="photo-viewer" class="photo-viewer" aria-label="毛寶照片放大檢視">
         <header><span id="photo-viewer-name"></span><button type="button" onclick="document.getElementById('photo-viewer').close()">關閉 ✕</button></header>
+        <p id="photo-viewer-note" role="status"></p>
         <img id="photo-viewer-image" alt="">
     </dialog>
 
@@ -539,14 +549,27 @@
         let CURRENT_USER_UID = null;
         let GLOBAL_STORE = { activeTabId: "", tabs: {} };
         let activeListenerUnsubscribe = null;
+        let serverSnapshotReady = false;
+        let mainHasPendingWrites = false;
+        let photoWorkBusy = false;
+        let photoWorkQueue = Promise.resolve();
+        let migrationScheduled = false;
+        let migrationPaused = false;
+        let photoPickInProgress = false;
+        let photoViewerRequest = 0;
+        const fullPhotoCache = new Map();
 
         auth.onAuthStateChanged(user => {
             if (user) {
                 CURRENT_USER_UID = user.uid;
+                serverSnapshotReady = false;
+                fullPhotoCache.clear();
                 document.getElementById("auth-screen").style.display = "none";
                 syncDatabaseWithCloud();
             } else {
                 CURRENT_USER_UID = null;
+                serverSnapshotReady = false;
+                fullPhotoCache.clear();
                 document.getElementById("auth-screen").style.display = "flex";
                 document.getElementById("control-panel").style.opacity = "0.3";
             }
@@ -570,12 +593,15 @@
         function syncDatabaseWithCloud() {
             if (!CURRENT_USER_UID) return;
             activeListenerUnsubscribe = db.collection("users").doc(CURRENT_USER_UID)
-                .onSnapshot(doc => {
+                .onSnapshot({ includeMetadataChanges: true }, doc => {
                     const light = document.getElementById("status-light");
                     const txt = document.getElementById("status-text");
                     if (doc.metadata.hasPendingWrites) { light.className = "status-dot yellow"; txt.innerText = "同步中"; }
                     else if (!navigator.onLine) { light.className = "status-dot blue"; txt.innerText = "離線中"; }
+                    else if (doc.metadata.fromCache) { light.className = "status-dot blue"; txt.innerText = "讀取快取中"; }
                     else { light.className = "status-dot green"; txt.innerText = "已同步"; }
+                    mainHasPendingWrites = doc.metadata.hasPendingWrites;
+                    serverSnapshotReady = !doc.metadata.fromCache;
 
                     if (doc.exists) { GLOBAL_STORE = doc.data(); }
                     else { forceResetToDefault(); }
@@ -588,12 +614,18 @@
                         renderTabs(); 
                         renderActiveContent(); 
                     }
+                    maybeMigratePhotos();
                 }, err => { console.error("同步錯誤:", err); });
         }
 
         function saveToCloud() {
-            if (!CURRENT_USER_UID) return;
-            db.collection("users").doc(CURRENT_USER_UID).set(GLOBAL_STORE).catch(e => {});
+            if (!CURRENT_USER_UID || photoWorkBusy) return Promise.resolve(false);
+            return db.collection("users").doc(CURRENT_USER_UID).set(GLOBAL_STORE).then(() => true).catch(e => {
+                document.getElementById('status-text').innerText = '儲存未成功，請確認連線';
+                document.getElementById('status-light').className = 'status-dot yellow';
+                console.error('儲存失敗:', e.code);
+                return false;
+            });
         }
 
         function createBlankTabData(name) {
@@ -741,6 +773,146 @@
         }
 
 
+        function photoCollection(uid) {
+            return db.collection('users').doc(uid).collection('petPhotos');
+        }
+        function photoField(tabId, slotId, key) {
+            if (!/^[\w-]+$/.test(tabId) || !/^[\w-]+$/.test(slotId)) throw new Error('照片位置無效');
+            return 'tabs.' + tabId + '.cats.' + slotId + '.' + key;
+        }
+        function imageFromSource(source) {
+            return new Promise((resolve, reject) => {
+                const image = new Image();
+                image.onload = () => resolve(image);
+                image.onerror = () => reject(new Error('照片無法讀取，請重新選擇 JPG、PNG 或其他瀏覽器支援的照片。'));
+                image.src = source;
+            });
+        }
+        function readPhotoFile(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = () => reject(new Error('照片無法讀取，請重新選擇照片。'));
+                reader.readAsDataURL(file);
+            });
+        }
+        function encodePhoto(image, bound, quality) {
+            const scale = Math.min(1, bound / Math.max(image.width, image.height));
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.max(1, Math.round(image.width * scale));
+            canvas.height = Math.max(1, Math.round(image.height * scale));
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
+            return canvas.toDataURL('image/jpeg', quality);
+        }
+        function cacheFullPhoto(uid, photoId, image) {
+            const key = uid + ':' + photoId;
+            fullPhotoCache.delete(key);
+            fullPhotoCache.set(key, image);
+            while (fullPhotoCache.size > 50) fullPhotoCache.delete(fullPhotoCache.keys().next().value);
+        }
+        async function getFullPhoto(uid, cat) {
+            if (!cat.photoId) return cat.img;
+            if (!/^[\w-]+$/.test(cat.photoId)) throw new Error('照片位置無效');
+            const cached = fullPhotoCache.get(uid + ':' + cat.photoId);
+            if (cached) return cached;
+            const snapshot = await photoCollection(uid).doc(cat.photoId).get();
+            const photo = snapshot.exists ? snapshot.data() : null;
+            if (!photo || photo.ownerUid !== uid || !/^data:image\/(jpeg|png|webp);base64,/.test(photo.image)) {
+                throw new Error('完整照片暫時無法讀取，請確認連線後再試。');
+            }
+            cacheFullPhoto(uid, cat.photoId, photo.image);
+            return photo.image;
+        }
+        function setPhotoWork(label, busy) {
+            photoWorkBusy = busy;
+            document.getElementById('photo-work-label').textContent = label;
+            document.getElementById('photo-work').hidden = !busy;
+            ['tabs-bar', 'control-panel', 'app-content'].forEach(id => {
+                document.getElementById(id).inert = busy;
+            });
+        }
+        function withPhotoWork(label, work) {
+            const pending = photoWorkQueue.then(async () => {
+                setPhotoWork(label, true);
+                try { return await work(); }
+                finally { setPhotoWork('', false); }
+            });
+            photoWorkQueue = pending.catch(() => {});
+            return pending;
+        }
+        function legacyPhotoJobs(store) {
+            const jobs = [];
+            Object.entries(store.tabs || {}).forEach(([tabId, tab]) => {
+                Object.entries(tab.cats || {}).forEach(([slotId, cat]) => {
+                    if (cat.img && !cat.photoId && /^data:image\//.test(cat.img)) jobs.push({tabId, slotId, source:cat.img});
+                });
+            });
+            return jobs;
+        }
+        function reportPhotoStorageError(error) {
+            migrationPaused = true;
+            document.getElementById('photo-storage-notice').hidden = false;
+            document.getElementById('photo-storage-message').textContent =
+                '照片整理尚未完成，原有照片已保留。請確認連線後重試。' +
+                (error.code === 'permission-denied' ? '目前帳號沒有照片儲存權限。' : '');
+            console.error('照片整理暫停:', error.code || error.message);
+        }
+        async function maybeMigratePhotos() {
+            const typing = ['INPUT', 'TEXTAREA'].includes(document.activeElement?.tagName);
+            if (!CURRENT_USER_UID || !navigator.onLine || !serverSnapshotReady || mainHasPendingWrites ||
+                photoWorkBusy || migrationScheduled || migrationPaused || photoPickInProgress ||
+                typing || cardDrag || frameEdit || document.getElementById('photo-viewer').open) return;
+            if (!legacyPhotoJobs(GLOBAL_STORE).length) return;
+            const uid = CURRENT_USER_UID;
+            migrationScheduled = true;
+            try {
+                await withPhotoWork('正在整理舊照片，請稍候', async () => {
+                    await db.waitForPendingWrites();
+                    const parent = db.collection('users').doc(uid);
+                    const latest = await parent.get({source:'server'});
+                    if (!latest.exists || CURRENT_USER_UID !== uid) return;
+                    const jobs = legacyPhotoJobs(latest.data());
+                    for (let i=0; i<jobs.length; i++) {
+                        if (CURRENT_USER_UID !== uid) return;
+                        if (!navigator.onLine) throw new Error('目前離線');
+                        const job = jobs[i];
+                        setPhotoWork('正在整理照片 ' + (i+1) + '／' + jobs.length, true);
+                        const image = await imageFromSource(job.source);
+                        const thumbnail = Math.max(image.width,image.height) <= 240 ? job.source : encodePhoto(image, 240, 0.65);
+                        const fullRef = photoCollection(uid).doc();
+                        const changed = await db.runTransaction(async transaction => {
+                            const snapshot = await transaction.get(parent);
+                            const cat = snapshot.data()?.tabs?.[job.tabId]?.cats?.[job.slotId];
+                            if (!cat || cat.photoId || cat.img !== job.source) return false;
+                            transaction.set(fullRef, {ownerUid:uid, image:job.source, schemaVersion:1});
+                            transaction.update(parent, {
+                                [photoField(job.tabId,job.slotId,'img')]: thumbnail,
+                                [photoField(job.tabId,job.slotId,'photoId')]: fullRef.id
+                            });
+                            return true;
+                        });
+                        if (changed && CURRENT_USER_UID === uid) {
+                            const local = GLOBAL_STORE.tabs?.[job.tabId]?.cats?.[job.slotId];
+                            if (local && local.img === job.source && !local.photoId) {
+                                local.img = thumbnail; local.photoId = fullRef.id;
+                            }
+                        }
+                    }
+                    document.getElementById('photo-storage-notice').hidden = true;
+                    if (CURRENT_USER_UID === uid) { renderTabs(); renderActiveContent(); }
+                });
+            } catch (error) { reportPhotoStorageError(error); }
+            finally { migrationScheduled = false; }
+        }
+        function retryPhotoMigration() {
+            migrationPaused = false;
+            maybeMigratePhotos();
+        }
+        document.addEventListener('focusout', () => setTimeout(maybeMigratePhotos, 0));
+
         function normalizedFrame(frame) {
             const clamp = (n,min,max,fallback) => Number.isFinite(Number(n)) ? Math.min(max,Math.max(min,Number(n))) : fallback;
             return {x:clamp(frame?.x,0,100,50),y:clamp(frame?.y,0,100,50),zoom:clamp(frame?.zoom,1,3,1)};
@@ -755,14 +927,15 @@
             if (GLOBAL_STORE.tabs?.[tabId]?.isLocked !== false) return;
             const target={slotId,tabId,userUid:CURRENT_USER_UID};
             photoPickTarget=target;
+            photoPickInProgress=true;
             if (typeof window.showOpenFilePicker === 'function') {
                 try {
                     const [handle]=await window.showOpenFilePicker({id:'lili-pet-photos',multiple:false,types:[{description:'照片',accept:{'image/*':['.jpg','.jpeg','.png','.webp','.heic']}}]});
                     const file=await handle.getFile();
-                    compressPhoto({target:{files:[file],value:''}},slotId,target);
+                    await compressPhoto({target:{files:[file],value:''}},slotId,target);
                     return;
                 } catch(error) {
-                    if(error.name==='AbortError') return;
+                    if(error.name==='AbortError') { photoPickInProgress=false; setTimeout(maybeMigratePhotos,0); return; }
                 }
             }
             const input=document.getElementById('shared-photo-input');
@@ -773,14 +946,25 @@
             const target=photoPickTarget;
             if(target) compressPhoto(event,target.slotId,target);
         });
+        document.getElementById('shared-photo-input').addEventListener('cancel',()=>{
+            photoPickInProgress=false;
+            maybeMigratePhotos();
+        });
         let frameEdit=null, framePointer=null;
-        function editPhotoFrame(slotId) {
+        async function editPhotoFrame(slotId) {
             const tabId=GLOBAL_STORE.activeTabId;
             const data=GLOBAL_STORE.tabs?.[tabId], cat=data?.cats?.[slotId];
             if(data?.isLocked!==false || !cat?.img) return;
-            frameEdit={tabId,slotId,img:cat.img,frame:normalizedFrame(cat.photoFrame)};
+            const uid=CURRENT_USER_UID;
+            let source;
+            try { source=await getFullPhoto(uid,cat); }
+            catch(error) { alert('完整照片暫時無法讀取，請確認連線後再調整取景。'); return; }
+            const current=GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
+            if(CURRENT_USER_UID!==uid || GLOBAL_STORE.activeTabId!==tabId ||
+                GLOBAL_STORE.tabs?.[tabId]?.isLocked!==false || current?.img!==cat.img || current?.photoId!==cat.photoId) return;
+            frameEdit={tabId,slotId,img:cat.img,photoId:cat.photoId || '',frame:normalizedFrame(cat.photoFrame)};
             const image=document.getElementById('frame-image');
-            image.src=cat.img;
+            image.src=source;
             document.getElementById('frame-zoom').value=frameEdit.frame.zoom;
             drawFramePreview();
             document.getElementById('frame-editor').showModal();
@@ -791,7 +975,7 @@
         function savePhotoFrame() {
             if(!frameEdit) return;
             const d=frameEdit, data=GLOBAL_STORE.tabs?.[d.tabId],cat=data?.cats?.[d.slotId];
-            if(data?.isLocked===false && cat?.img===d.img) {
+            if(data?.isLocked===false && cat?.img===d.img && (cat.photoId || '')===d.photoId) {
                 cat.photoFrame=normalizedFrame(d.frame);
                 saveToCloud(); if(GLOBAL_STORE.activeTabId===d.tabId) renderActiveContent();
             }
@@ -820,29 +1004,70 @@
         });
         document.getElementById('frame-editor').addEventListener('close',()=>{
             frameEdit=null;framePointer=null;document.getElementById('frame-image').removeAttribute('src');
+            setTimeout(maybeMigratePhotos,0);
         });
 
-        function openPhotoViewer(slotId, trigger) {
+        async function openPhotoViewer(slotId, trigger) {
             const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
             const cat = data?.cats?.[slotId];
             if (!cat?.img || cardDrag?.started) return;
             const viewer = document.getElementById('photo-viewer');
             const image = document.getElementById('photo-viewer-image');
+            const note = document.getElementById('photo-viewer-note');
+            const uid = CURRENT_USER_UID;
+            const request = ++photoViewerRequest;
             image.src = cat.img;
             image.alt = cat.name || '毛寶照片';
             document.getElementById('photo-viewer-name').textContent = cat.name || '毛寶照片';
-            viewer.showModal();
+            note.textContent = cat.photoId ? '正在載入完整照片…' : '';
+            if (!viewer.open) viewer.showModal();
+            try {
+                const full = await getFullPhoto(uid,cat);
+                if (viewer.open && request===photoViewerRequest && CURRENT_USER_UID===uid) {
+                    image.src = full; note.textContent = '';
+                }
+            } catch(error) {
+                if (viewer.open && request===photoViewerRequest) note.textContent = '完整照片暫時無法載入，目前顯示小圖。請連線後重新點開。';
+            }
         }
         document.getElementById('photo-viewer').addEventListener('close', () => {
+            photoViewerRequest++;
             document.getElementById('photo-viewer-image').removeAttribute('src');
+            setTimeout(maybeMigratePhotos,0);
         });
 
-        function deletePhoto(slotId) {
-            const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+        async function deletePhoto(slotId) {
+            const tabId = GLOBAL_STORE.activeTabId;
+            const uid = CURRENT_USER_UID;
+            const data = GLOBAL_STORE.tabs[tabId];
             if (!data || data.isLocked !== false || !data.cats[slotId]?.img) return;
             if (!confirm('確定刪除這張照片嗎？名字、備註與點名狀態會保留。')) return;
-            data.cats[slotId].img = '';
-            saveToCloud(); renderActiveContent();
+            if (!navigator.onLine) { alert('請連線後再刪除照片，避免雲端與畫面不一致。'); return; }
+            const expected = {...data.cats[slotId]};
+            try {
+                await withPhotoWork('正在刪除照片',async()=>{
+                    await db.waitForPendingWrites();
+                    const parent=db.collection('users').doc(uid);
+                    await db.runTransaction(async transaction=>{
+                        const snapshot=await transaction.get(parent);
+                        const cat=snapshot.data()?.tabs?.[tabId]?.cats?.[slotId];
+                        if(CURRENT_USER_UID!==uid || snapshot.data()?.tabs?.[tabId]?.isLocked!==false ||
+                            !cat || cat.img!==expected.img || cat.photoId!==expected.photoId) throw new Error('照片已更新，請重新確認後再刪除。');
+                        transaction.update(parent,{
+                            [photoField(tabId,slotId,'img')]:'',
+                            [photoField(tabId,slotId,'photoId')]:firebase.firestore.FieldValue.delete(),
+                            [photoField(tabId,slotId,'photoFrame')]:firebase.firestore.FieldValue.delete()
+                        });
+                        if(cat.photoId) transaction.delete(photoCollection(uid).doc(cat.photoId));
+                    });
+                    const local=GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
+                    if(local && local.img===expected.img && local.photoId===expected.photoId) {
+                        local.img='';delete local.photoId;delete local.photoFrame;
+                    }
+                    if(expected.photoId) fullPhotoCache.delete(uid+':'+expected.photoId);
+                    renderActiveContent();
+                });
+            } catch(error) { alert('照片尚未刪除，請確認連線後重試。'); }
         }
 
         let cardDrag = null;
@@ -990,67 +1215,65 @@
             if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) { GLOBAL_STORE.tabs[activeId].isLocked = GLOBAL_STORE.tabs[activeId].isLocked === false; saveToCloud(); renderActiveContent(); }
         }
 
-        function compressPhoto(event, slotId, target) {
+        async function compressPhoto(event, slotId, target) {
             const input = event.target;
             const file = input.files[0];
-            if (!file) return;
-            const tabId = target?.tabId || GLOBAL_STORE.activeTabId;
-            const userUid = target?.userUid || CURRENT_USER_UID;
-            const data = GLOBAL_STORE.tabs?.[tabId];
-            if (!userUid || !data || data.isLocked !== false) return;
-            const previousImage = data.cats?.[slotId]?.img || '';
-            const previousFrame = data.cats?.[slotId]?.photoFrame;
+            if (!file) { photoPickInProgress=false; return; }
             input.value = '';
-            const reader = new FileReader();
-            const fail = () => { input.value = ''; alert('照片無法讀取，請重新選擇 JPG、PNG 或其他瀏覽器支援的照片。'); };
-            reader.onerror = fail;
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onerror = fail;
-                img.onload = async function() {
-                    try {
-                        const canvas = document.createElement('canvas');
-                        const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
-                        canvas.width = Math.max(1, Math.round(img.width * scale));
-                        canvas.height = Math.max(1, Math.round(img.height * scale));
-                        const ctx = canvas.getContext('2d');
-                        ctx.fillStyle = '#ffffff';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                        const result = canvas.toDataURL('image/jpeg', 0.85);
-                        const current = GLOBAL_STORE.tabs?.[tabId];
-                        if (CURRENT_USER_UID !== userUid || !current || current.isLocked !== false ||
-                            (current.cats?.[slotId]?.img || '') !== previousImage) return;
-                        const candidate = JSON.parse(JSON.stringify(GLOBAL_STORE));
-                        if (!candidate.tabs[tabId].cats) candidate.tabs[tabId].cats = {};
-                        if (!candidate.tabs[tabId].cats[slotId]) candidate.tabs[tabId].cats[slotId] = {};
-                        candidate.tabs[tabId].cats[slotId].img = result;
-                        candidate.tabs[tabId].cats[slotId].photoFrame = {x:50,y:50,zoom:1};
-                        // Firestore document limit is 1 MiB; reserve room for field metadata and text edits.
-                        if (new TextEncoder().encode(JSON.stringify(candidate)).length > 900000) {
-                            alert('目前雲端照片容量不足，這張照片尚未更換。請先移除不需要的照片，再重新上傳。');
-                            input.value = '';
-                            return;
+            const tabId = target?.tabId || GLOBAL_STORE.activeTabId;
+            const uid = target?.userUid || CURRENT_USER_UID;
+            const data = GLOBAL_STORE.tabs?.[tabId];
+            if (!uid || CURRENT_USER_UID!==uid || !data || data.isLocked!==false) { photoPickInProgress=false; return; }
+            if (!navigator.onLine) { photoPickInProgress=false; alert('請連線後再上傳照片，原有照片會保留。'); return; }
+            const expected = {...data.cats?.[slotId]};
+            let uploaded = false;
+            try {
+                await withPhotoWork('正在儲存照片，請稍候', async () => {
+                    await db.waitForPendingWrites();
+                    const image = await imageFromSource(await readPhotoFile(file));
+                    const full = encodePhoto(image, 1200, 0.85);
+                    const thumbnail = encodePhoto(image, 240, 0.65);
+                    if (new TextEncoder().encode(full).length > 950000) throw new Error('這張照片內容較大，請先裁去多餘背景後再選取，原有照片會保留。');
+                    const parent = db.collection('users').doc(uid);
+                    const fullRef = photoCollection(uid).doc();
+                    await db.runTransaction(async transaction => {
+                        const snapshot = await transaction.get(parent);
+                        const store = snapshot.data();
+                        const tab = store?.tabs?.[tabId];
+                        const existing = tab?.cats?.[slotId];
+                        if (CURRENT_USER_UID!==uid || !tab || tab.isLocked!==false ||
+                            (existing?.img || '')!==(expected.img || '') || existing?.photoId!==expected.photoId) {
+                            throw new Error('這張卡片剛剛有變動，請重新選取照片。原有照片會保留。');
                         }
-                        if (!current.cats) current.cats = {};
-                        if (!current.cats[slotId]) current.cats[slotId] = {};
-                        current.cats[slotId].img = result;
-                        current.cats[slotId].photoFrame = {x:50,y:50,zoom:1};
-                        if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
-                        try {
-                            await db.collection('users').doc(userUid).set(GLOBAL_STORE);
-                            if(GLOBAL_STORE.activeTabId===tabId) editPhotoFrame(slotId);
-                        } catch (error) {
-                            const latest = GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
-                            if (latest?.img === result) { latest.img = previousImage; if(previousFrame) latest.photoFrame=previousFrame; else delete latest.photoFrame; }
-                            if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
-                            alert('照片未能儲存到雲端，請確認連線後重新上傳。');
+                        if (!tab.cats) tab.cats={};
+                        const cat = tab.cats[slotId] || (tab.cats[slotId]={checked:false,name:'',desc:'',img:''});
+                        // Originals live in individual documents; only the thumbnail enters the main record.
+                        cat.img = thumbnail; cat.photoId = fullRef.id; cat.photoFrame = {x:50,y:50,zoom:1};
+                        if (new TextEncoder().encode(JSON.stringify(store)).length > 950000) {
+                            throw new Error('舊照片仍需整理，請先按「重試整理照片」，完成後再上傳。');
                         }
-                    } catch (error) { fail(); }
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
+                        transaction.set(fullRef, {ownerUid:uid, image:full, schemaVersion:1});
+                        transaction.update(parent, {
+                            [photoField(tabId,slotId,'img')]:thumbnail,
+                            [photoField(tabId,slotId,'photoId')]:fullRef.id,
+                            [photoField(tabId,slotId,'photoFrame')]:{x:50,y:50,zoom:1}
+                        });
+                    });
+                    if(CURRENT_USER_UID!==uid) return;
+                    cacheFullPhoto(uid,fullRef.id,full);
+                    const local=GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
+                    if(local && (local.img || '')===(expected.img || '') && local.photoId===expected.photoId) {
+                        local.img=thumbnail;local.photoId=fullRef.id;local.photoFrame={x:50,y:50,zoom:1};
+                    }
+                    if(GLOBAL_STORE.activeTabId===tabId) renderActiveContent();
+                    uploaded=true;
+                });
+            } catch(error) {
+                const expectedMessage = error.message && !error.code ? error.message : '照片未能儲存，請確認連線與儲存權限後重試。原有照片會保留。';
+                alert(expectedMessage);
+            } finally { photoPickInProgress=false; }
+            if(uploaded && CURRENT_USER_UID===uid && GLOBAL_STORE.activeTabId===tabId) await editPhotoFrame(slotId);
+            else setTimeout(maybeMigratePhotos,0);
         }
 
         function deleteCurrentTab() {
@@ -1081,7 +1304,7 @@
             window.print();
         }
 
-        window.addEventListener('online', () => { saveToCloud(); });
+        window.addEventListener('online', () => { migrationPaused=false; maybeMigratePhotos(); });
         window.addEventListener('offline', () => {
             const light = document.getElementById("status-light");
             if (light) { light.className = "status-dot blue"; document.getElementById("status-text").innerText = "離線中"; }
