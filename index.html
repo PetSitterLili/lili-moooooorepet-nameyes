@@ -430,6 +430,17 @@
         .photo-viewer button { border:1px solid #888; border-radius:10px; background:#333; color:white; padding:12px 18px; font-size:16px; cursor:pointer; }
         .photo-viewer img { display:block; flex:1; min-height:0; width:100%; object-fit:contain; padding:0 12px 20px; }
         @media print { .photo-change,.photo-viewer { display:none!important; } }
+    
+        #frame-editor { width:min(92vw,420px); border:0; border-radius:20px; padding:24px; color:#50415a; }
+        #frame-editor::backdrop { background:#0009; }
+        #frame-editor h2 { font-size:20px; margin-top:0; }
+        #frame-editor p { font-size:14px; }
+        #frame-box { width:min(65vw,260px); aspect-ratio:1; margin:20px auto; border-radius:50%; overflow:hidden; touch-action:none; background:#eee; cursor:grab; }
+        #frame-image { width:100%; height:100%; object-fit:cover; pointer-events:none; user-select:none; }
+        #frame-zoom { width:100%; margin:20px 0; }
+        .frame-actions { display:flex; justify-content:flex-end; gap:12px; }
+        .frame-actions button { padding:12px 16px; border:1px solid #d8d0df; border-radius:10px; font-size:16px; background:white; color:#50415a; }
+        @media print { #frame-editor,#shared-photo-input {display:none!important;} }
     </style>
 </head>
 <body>
@@ -473,6 +484,13 @@
     </div>
 
     <div id="app-content"></div>
+    <input id="shared-photo-input" type="file" accept="image/*" hidden>
+    <dialog id="frame-editor" aria-label="調整大頭貼取景">
+        <h2>調整大頭貼取景</h2><p>拖曳照片調整位置，用下方滑桿放大。點開大頭貼時仍會顯示完整照片。</p>
+        <div id="frame-box"><img id="frame-image" alt="取景預覽" draggable="false"></div>
+        <label>放大倍率 <input id="frame-zoom" type="range" min="1" max="3" step="0.01" value="1"></label>
+        <div class="frame-actions"><button type="button" onclick="document.getElementById('frame-editor').close()">取消</button><button type="button" onclick="savePhotoFrame()">儲存取景</button></div>
+    </dialog>
     <dialog id="photo-viewer" class="photo-viewer" aria-label="毛寶照片放大檢視">
         <header><span id="photo-viewer-name"></span><button type="button" onclick="document.getElementById('photo-viewer').close()">關閉 ✕</button></header>
         <img id="photo-viewer-image" alt="">
@@ -663,12 +681,12 @@
                                     <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
                                     <span class="print-check-badge ${isChecked ? 'badge-yes' : 'badge-no'}" id="badge_${slotId}">${isChecked ? '✓ 當日已確認點名' : '✕ 未見到未確認'}</span>
                                     <div class="photo-box" ${hasImg ? `role="button" tabindex="0" aria-label="放大照片" onclick="openPhotoViewer('${slotId}', this)" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();openPhotoViewer('${slotId}', this)}"` : ''}>
-                                        <img id="img_${slotId}" src="${cat.img || ''}" style="display:${hasImg ? 'block' : 'none'};">
+                                        <img id="img_${slotId}" src="${cat.img || ''}" style="display:${hasImg ? 'block' : 'none'};${photoFrameStyle(cat.photoFrame)}">
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
-                                        ${!hasImg && !isTabLocked ? `<input type="file" accept="image/*" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')">` : ''}
+                                        ${!hasImg && !isTabLocked ? `<button type="button" class="native-file-overlay" aria-label="新增照片" onclick="choosePhoto('${slotId}')"></button>` : ''}
 
                                     </div>
-                                    ${hasImg && !isTabLocked ? `<label class="photo-change">更換照片<input type="file" accept="image/*" class="native-file-overlay" onchange="compressPhoto(event, '${slotId}')"></label><button type="button" class="photo-delete" onclick="deletePhoto('${slotId}')">刪除照片</button>` : ''}
+                                    ${hasImg && !isTabLocked ? `<button type="button" class="photo-change" onclick="choosePhoto('${slotId}')">更換照片</button><button type="button" class="photo-change" onclick="editPhotoFrame('${slotId}')">調整取景</button><button type="button" class="photo-delete" onclick="deletePhoto('${slotId}')">刪除照片</button>` : ''}
                                 </div>
                                 <div class="cat-right">
                                     <input type="text" class="cat-name-input" id="name_${slotId}" value="${cat.name || ''}" placeholder="輸入毛孩名字" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
@@ -721,6 +739,88 @@
             });
             data.cardOrder = order;
         }
+
+
+        function normalizedFrame(frame) {
+            const clamp = (n,min,max,fallback) => Number.isFinite(Number(n)) ? Math.min(max,Math.max(min,Number(n))) : fallback;
+            return {x:clamp(frame?.x,0,100,50),y:clamp(frame?.y,0,100,50),zoom:clamp(frame?.zoom,1,3,1)};
+        }
+        function photoFrameStyle(frame) {
+            const f=normalizedFrame(frame);
+            return 'object-position:'+f.x+'% '+f.y+'%;transform:scale('+f.zoom+');transform-origin:'+f.x+'% '+f.y+'%;';
+        }
+        let photoPickTarget=null;
+        async function choosePhoto(slotId) {
+            const tabId=GLOBAL_STORE.activeTabId;
+            if (GLOBAL_STORE.tabs?.[tabId]?.isLocked !== false) return;
+            const target={slotId,tabId,userUid:CURRENT_USER_UID};
+            photoPickTarget=target;
+            if (typeof window.showOpenFilePicker === 'function') {
+                try {
+                    const [handle]=await window.showOpenFilePicker({id:'lili-pet-photos',multiple:false,types:[{description:'照片',accept:{'image/*':['.jpg','.jpeg','.png','.webp','.heic']}}]});
+                    const file=await handle.getFile();
+                    compressPhoto({target:{files:[file],value:''}},slotId,target);
+                    return;
+                } catch(error) {
+                    if(error.name==='AbortError') return;
+                }
+            }
+            const input=document.getElementById('shared-photo-input');
+            input.value='';
+            input.click();
+        }
+        document.getElementById('shared-photo-input').addEventListener('change',event=>{
+            const target=photoPickTarget;
+            if(target) compressPhoto(event,target.slotId,target);
+        });
+        let frameEdit=null, framePointer=null;
+        function editPhotoFrame(slotId) {
+            const tabId=GLOBAL_STORE.activeTabId;
+            const data=GLOBAL_STORE.tabs?.[tabId], cat=data?.cats?.[slotId];
+            if(data?.isLocked!==false || !cat?.img) return;
+            frameEdit={tabId,slotId,img:cat.img,frame:normalizedFrame(cat.photoFrame)};
+            const image=document.getElementById('frame-image');
+            image.src=cat.img;
+            document.getElementById('frame-zoom').value=frameEdit.frame.zoom;
+            drawFramePreview();
+            document.getElementById('frame-editor').showModal();
+        }
+        function drawFramePreview() {
+            if(frameEdit) document.getElementById('frame-image').style.cssText=photoFrameStyle(frameEdit.frame);
+        }
+        function savePhotoFrame() {
+            if(!frameEdit) return;
+            const d=frameEdit, data=GLOBAL_STORE.tabs?.[d.tabId],cat=data?.cats?.[d.slotId];
+            if(data?.isLocked===false && cat?.img===d.img) {
+                cat.photoFrame=normalizedFrame(d.frame);
+                saveToCloud(); if(GLOBAL_STORE.activeTabId===d.tabId) renderActiveContent();
+            }
+            document.getElementById('frame-editor').close();
+        }
+        const frameBox=document.getElementById('frame-box');
+        frameBox.addEventListener('pointerdown',event=>{
+            if(!frameEdit) return;
+            event.preventDefault(); frameBox.setPointerCapture(event.pointerId);
+            framePointer={id:event.pointerId,x:event.clientX,y:event.clientY};
+        });
+        frameBox.addEventListener('pointermove',event=>{
+            if(!frameEdit || framePointer?.id!==event.pointerId) return;
+            const image=document.getElementById('frame-image');
+            const size=frameBox.clientWidth, ratio=image.naturalWidth/image.naturalHeight;
+            if(!Number.isFinite(ratio)||ratio<=0) return;
+            const width=size*Math.max(1,ratio)*frameEdit.frame.zoom;
+            const height=size*Math.max(1,1/ratio)*frameEdit.frame.zoom;
+            if(width>size) frameEdit.frame.x=Math.max(0,Math.min(100,frameEdit.frame.x-(event.clientX-framePointer.x)/(width-size)*100));
+            if(height>size) frameEdit.frame.y=Math.max(0,Math.min(100,frameEdit.frame.y-(event.clientY-framePointer.y)/(height-size)*100));
+            framePointer.x=event.clientX;framePointer.y=event.clientY;drawFramePreview();
+        });
+        ['pointerup','pointercancel','lostpointercapture'].forEach(type=>frameBox.addEventListener(type,()=>{framePointer=null;}));
+        document.getElementById('frame-zoom').addEventListener('input',event=>{
+            if(frameEdit){frameEdit.frame.zoom=Number(event.target.value);drawFramePreview();}
+        });
+        document.getElementById('frame-editor').addEventListener('close',()=>{
+            frameEdit=null;framePointer=null;document.getElementById('frame-image').removeAttribute('src');
+        });
 
         function openPhotoViewer(slotId, trigger) {
             const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
@@ -890,15 +990,17 @@
             if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) { GLOBAL_STORE.tabs[activeId].isLocked = GLOBAL_STORE.tabs[activeId].isLocked === false; saveToCloud(); renderActiveContent(); }
         }
 
-        function compressPhoto(event, slotId) {
+        function compressPhoto(event, slotId, target) {
             const input = event.target;
             const file = input.files[0];
             if (!file) return;
-            const tabId = GLOBAL_STORE.activeTabId;
-            const userUid = CURRENT_USER_UID;
+            const tabId = target?.tabId || GLOBAL_STORE.activeTabId;
+            const userUid = target?.userUid || CURRENT_USER_UID;
             const data = GLOBAL_STORE.tabs?.[tabId];
             if (!userUid || !data || data.isLocked !== false) return;
             const previousImage = data.cats?.[slotId]?.img || '';
+            const previousFrame = data.cats?.[slotId]?.photoFrame;
+            input.value = '';
             const reader = new FileReader();
             const fail = () => { input.value = ''; alert('照片無法讀取，請重新選擇 JPG、PNG 或其他瀏覽器支援的照片。'); };
             reader.onerror = fail;
@@ -923,6 +1025,7 @@
                         if (!candidate.tabs[tabId].cats) candidate.tabs[tabId].cats = {};
                         if (!candidate.tabs[tabId].cats[slotId]) candidate.tabs[tabId].cats[slotId] = {};
                         candidate.tabs[tabId].cats[slotId].img = result;
+                        candidate.tabs[tabId].cats[slotId].photoFrame = {x:50,y:50,zoom:1};
                         // Firestore document limit is 1 MiB; reserve room for field metadata and text edits.
                         if (new TextEncoder().encode(JSON.stringify(candidate)).length > 900000) {
                             alert('目前雲端照片容量不足，這張照片尚未更換。請先移除不需要的照片，再重新上傳。');
@@ -932,12 +1035,14 @@
                         if (!current.cats) current.cats = {};
                         if (!current.cats[slotId]) current.cats[slotId] = {};
                         current.cats[slotId].img = result;
+                        current.cats[slotId].photoFrame = {x:50,y:50,zoom:1};
                         if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
                         try {
                             await db.collection('users').doc(userUid).set(GLOBAL_STORE);
+                            if(GLOBAL_STORE.activeTabId===tabId) editPhotoFrame(slotId);
                         } catch (error) {
                             const latest = GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
-                            if (latest?.img === result) latest.img = previousImage;
+                            if (latest?.img === result) { latest.img = previousImage; if(previousFrame) latest.photoFrame=previousFrame; else delete latest.photoFrame; }
                             if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
                             alert('照片未能儲存到雲端，請確認連線後重新上傳。');
                         }
