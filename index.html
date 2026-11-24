@@ -407,6 +407,19 @@
                 font-size: 8.5pt !important; 
             }
         }
+    
+        .card-tools[hidden] { display:none; }
+        .card-tools { display:flex; justify-content:flex-end; gap:10px; margin-bottom:8px; }
+        .move-handle, .photo-delete { border:1px solid #d8d0df; border-radius:8px; background:white; color:#50415a; padding:8px 12px; font:inherit; font-size:14px; }
+        .move-handle { touch-action:none; user-select:none; -webkit-user-select:none; cursor:grab; }
+        .photo-delete { color:#a33d3d; margin-top:6px; }
+        .cat-right { min-width:0; }
+        .cat-list { min-height:65px; }
+        .drag-floating { position:fixed!important; z-index:10000; pointer-events:none; margin:0; opacity:.93; box-shadow:0 14px 35px #50415a55; transform:rotate(1deg); }
+        .drag-source { opacity:.25; }
+        .drop-marker { height:8px; border-radius:6px; background:#9b89b3; margin:8px 0; }
+        .move-help { font-size:14px; color:#64566f; margin:0 0 12px; }
+        @media print { .card-tools,.photo-delete,.move-help,.drag-floating,.drop-marker { display:none!important; } }
     </style>
 </head>
 <body>
@@ -438,7 +451,7 @@
             
             <div class="cloud-status-badge">
                 <span class="status-dot green" id="status-light"></span>
-                <span id="status-text">雲端已安全鎖定</span>
+                <span id="status-text">已同步</span>
                 <button class="btn-delete" onclick="deleteCurrentTab()">刪除此案場</button>
             </div>
         </div>
@@ -530,7 +543,7 @@
                     const txt = document.getElementById("status-text");
                     if (doc.metadata.hasPendingWrites) { light.className = "status-dot yellow"; txt.innerText = "同步中"; }
                     else if (!navigator.onLine) { light.className = "status-dot blue"; txt.innerText = "離線中"; }
-                    else { light.className = "status-dot green"; txt.innerText = "雲端已安全鎖定"; }
+                    else { light.className = "status-dot green"; txt.innerText = "已同步"; }
 
                     if (doc.exists) { GLOBAL_STORE = doc.data(); }
                     else { forceResetToDefault(); }
@@ -539,7 +552,7 @@
                     const isTyping = document.activeElement && 
                                      (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA');
                     
-                    if (!isTyping) {
+                    if (!isTyping && !cardDrag) {
                         renderTabs(); 
                         renderActiveContent(); 
                     }
@@ -609,6 +622,8 @@
                 else { lockBtn.innerText = "🔒 鎖定檔案防誤觸"; lockBtn.classList.remove("is-locked"); }
             }
 
+            ensureCardOrder(data);
+            if (!isTabLocked) content.innerHTML = '<p class="move-help">長按「長按移動」或卡片空白處，可排序或移到其他樓層。</p>';
             SECTION_TEMPLATES.forEach(sec => {
                 const sectionsContainer = data.sections || {};
                 const secData = sectionsContainer[sec.id] || { title: sec.title, summary: "" };
@@ -617,16 +632,18 @@
                         <div class="section-header">
                             <input type="text" class="section-title-input" id="title_${sec.id}" value="${secData.title || sec.title}" ${isTabLocked ? 'readonly' : ''} oninput="updateTextData('${sec.id}', 'title', this.value)">
                         </div>
-                        <div class="cat-list">
+                        <div class="cat-list" data-section="${sec.id}">
                 `;
-                for (let i = 1; i <= sec.slots; i++) {
-                    let slotId = `${sec.id}_cat_${i}`;
+                for (const slotId of data.cardOrder[sec.id]) {
                     const catsContainer = data.cats || {};
                     const cat = catsContainer[slotId] || { checked: false, name: "", desc: "", img: "" };
                     const isChecked = cat.checked === true;
                     const hasImg = (cat.img || "") !== "";
                     sectionHTML += `
                         <div class="cat-card ${isChecked ? 'checked' : ''} ${(cat.name || "").trim() === '' ? 'empty-target' : ''}" id="card_${slotId}">
+                            <div class="card-tools" ${isTabLocked ? 'hidden' : ''}>
+                                <button type="button" class="move-handle" data-slot="${slotId}" aria-label="長按移動這張毛寶卡片">⠿ 長按移動</button>
+                            </div>
                             <div class="cat-row">
                                 <div class="cat-left">
                                     <input type="checkbox" class="cat-checkbox" id="check_${slotId}" ${isChecked ? 'checked' : ''} onchange="toggleAttendance('${slotId}')">
@@ -636,6 +653,7 @@
                                         <span class="photo-placeholder" id="ph_${slotId}" style="display:${hasImg ? 'none' : 'block'};">📷</span>
                                         <input type="file" class="native-file-overlay" id="file_${slotId}" onchange="compressPhoto(event, '${slotId}')" ${isTabLocked ? 'disabled' : ''}>
                                     </div>
+                                    ${hasImg && !isTabLocked ? `<button type="button" class="photo-delete" onclick="deletePhoto('${slotId}')">刪除照片</button>` : ''}
                                 </div>
                                 <div class="cat-right">
                                     <input type="text" class="cat-name-input" id="name_${slotId}" value="${cat.name || ''}" placeholder="輸入毛孩名字" ${isTabLocked ? 'readonly' : ''} oninput="updateCatData('${slotId}', 'name', this.value)">
@@ -656,6 +674,135 @@
                 content.innerHTML += sectionHTML;
             });
         }
+
+
+        function ensureCardOrder(data) {
+            const seen = new Set();
+            const order = {};
+            SECTION_TEMPLATES.forEach(sec => {
+                order[sec.id] = [];
+                const saved = data.cardOrder && data.cardOrder[sec.id];
+                if (Array.isArray(saved)) saved.forEach(id => {
+                    if (typeof id === 'string' && data.cats && data.cats[id] && !seen.has(id)) {
+                        seen.add(id); order[sec.id].push(id);
+                    }
+                });
+            });
+            SECTION_TEMPLATES.forEach(sec => {
+                for (let i=1; i<=sec.slots; i++) {
+                    const id = sec.id + '_cat_' + i;
+                    if (!seen.has(id)) { seen.add(id); order[sec.id].push(id); }
+                }
+            });
+            Object.keys(data.cats || {}).forEach(id => {
+                if (!seen.has(id)) { seen.add(id); order.sec_1.push(id); }
+            });
+            data.cardOrder = order;
+        }
+
+        function deletePhoto(slotId) {
+            const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+            if (!data || data.isLocked !== false || !data.cats[slotId]?.img) return;
+            if (!confirm('確定刪除這張照片嗎？名字、備註與點名狀態會保留。')) return;
+            data.cats[slotId].img = '';
+            saveToCloud(); renderActiveContent();
+        }
+
+        let cardDrag = null;
+        function finishCardDrag(commit) {
+            const d = cardDrag;
+            if (!d) return;
+            clearTimeout(d.timer); cancelAnimationFrame(d.frame);
+            if (d.started && commit) {
+                const data = GLOBAL_STORE.tabs[d.tabId];
+                if (data && GLOBAL_STORE.activeTabId === d.tabId && data.isLocked === false && d.targetSection) {
+                    ensureCardOrder(data);
+                    Object.values(data.cardOrder).forEach(ids => {
+                        const index = ids.indexOf(d.slotId);
+                        if (index >= 0) ids.splice(index, 1);
+                    });
+                    const ids = data.cardOrder[d.targetSection];
+                    const index = ids.indexOf(d.beforeId);
+                    ids.splice(index >= 0 ? index : ids.length, 0, d.slotId);
+                    saveToCloud();
+                }
+            }
+            d.ghost?.remove(); d.marker?.remove();
+            d.card.classList.remove('drag-source');
+            cardDrag = null;
+            if (d.started) renderActiveContent();
+        }
+        function updateDragTarget() {
+            const d = cardDrag;
+            if (!d?.started) return;
+            d.ghost.style.left = (d.x - d.offsetX) + 'px';
+            d.ghost.style.top = (d.y - d.offsetY) + 'px';
+            const element = document.elementFromPoint(d.x, d.y);
+            const section = element?.closest('.section-block');
+            if (!section) { d.targetSection = null; d.marker.remove(); return; }
+            const list = section.querySelector('.cat-list');
+            const cards = [...list.querySelectorAll('.cat-card')].filter(c => c !== d.card);
+            const before = cards.find(c => d.y < c.getBoundingClientRect().top + c.getBoundingClientRect().height / 2);
+            list.insertBefore(d.marker, before || null);
+            d.targetSection = section.id;
+            d.beforeId = before ? before.id.slice(5) : null;
+        }
+        document.addEventListener('pointerdown', event => {
+            if (cardDrag || event.button !== 0) return;
+            const card = event.target.closest('.cat-card');
+            if (!card || event.target.closest('input,textarea,.photo-box,.photo-delete')) return;
+            const data = GLOBAL_STORE.tabs[GLOBAL_STORE.activeTabId];
+            if (!data || data.isLocked !== false) return;
+            const rect = card.getBoundingClientRect();
+            const d = cardDrag = {
+                card, slotId:card.id.slice(5), tabId:GLOBAL_STORE.activeTabId,
+                pointerId:event.pointerId, startX:event.clientX, startY:event.clientY,
+                x:event.clientX, y:event.clientY, offsetX:event.clientX-rect.left, offsetY:event.clientY-rect.top
+            };
+            d.timer = setTimeout(() => {
+                if (cardDrag !== d) return;
+                d.started = true;
+                d.ghost = card.cloneNode(true);
+                d.ghost.removeAttribute('id');
+                d.ghost.querySelectorAll('[id]').forEach(el => el.removeAttribute('id'));
+                d.ghost.classList.add('drag-floating');
+                d.ghost.style.width = rect.width + 'px';
+                d.ghost.setAttribute('aria-hidden','true');
+                document.body.appendChild(d.ghost);
+                card.classList.add('drag-source');
+                d.marker = document.createElement('div'); d.marker.className = 'drop-marker';
+                updateDragTarget();
+                function scrollFrame() {
+                    if (cardDrag !== d) return;
+                    const speed = d.y < 90 ? -12 : d.y > innerHeight - 90 ? 12 : 0;
+                    if (speed) { window.scrollBy(0,speed); updateDragTarget(); }
+                    d.frame = requestAnimationFrame(scrollFrame);
+                }
+                d.frame = requestAnimationFrame(scrollFrame);
+            }, 450);
+        });
+        document.addEventListener('pointermove', event => {
+            const d = cardDrag;
+            if (!d || event.pointerId !== d.pointerId) return;
+            d.x = event.clientX; d.y = event.clientY;
+            if (!d.started) {
+                if (Math.hypot(d.x-d.startX,d.y-d.startY)>10) finishCardDrag(false);
+                return;
+            }
+            event.preventDefault(); updateDragTarget();
+        }, {passive:false});
+        document.addEventListener('touchmove', event => {
+            if (cardDrag?.started) event.preventDefault();
+        }, {passive:false});
+        document.addEventListener('pointerup', event => {
+            if (cardDrag?.pointerId === event.pointerId) finishCardDrag(true);
+        });
+        document.addEventListener('contextmenu', event => {
+            if (cardDrag?.started || event.target.closest('.move-handle')) event.preventDefault();
+        });
+        document.addEventListener('pointercancel', () => finishCardDrag(false));
+        document.addEventListener('keydown', event => { if (event.key === 'Escape') finishCardDrag(false); });
+        window.addEventListener('blur', () => finishCardDrag(false));
 
         function updateTextData(secId, key, val) {
             const activeId = GLOBAL_STORE.activeTabId;
