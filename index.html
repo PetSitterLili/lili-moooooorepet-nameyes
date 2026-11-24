@@ -891,24 +891,57 @@
         }
 
         function compressPhoto(event, slotId) {
-            const file = event.target.files[0]; if (!file) return;
+            const input = event.target;
+            const file = input.files[0];
+            if (!file) return;
+            const tabId = GLOBAL_STORE.activeTabId;
+            const userUid = CURRENT_USER_UID;
+            const data = GLOBAL_STORE.tabs?.[tabId];
+            if (!userUid || !data || data.isLocked !== false) return;
+            const previousImage = data.cats?.[slotId]?.img || '';
             const reader = new FileReader();
+            const fail = () => { input.value = ''; alert('照片無法讀取，請重新選擇 JPG、PNG 或其他瀏覽器支援的照片。'); };
+            reader.onerror = fail;
             reader.onload = function(e) {
                 const img = new Image();
-                img.onload = function() {
-                    const canvas = document.createElement('canvas'); const MAX_BOUND = 240; 
-                    let width = img.width; let height = img.height;
-                    if (width > height) { if (width > MAX_BOUND) { height *= MAX_BOUND / width; width = MAX_BOUND; } }
-                    else { if (height > MAX_BOUND) { width *= MAX_BOUND / height; height = MAX_BOUND; } }
-                    canvas.width = width; canvas.height = height;
-                    const ctx = canvas.getContext('2d'); ctx.drawImage(img, 0, 0, width, height);
-                    const base64Result = canvas.toDataURL('image/jpeg', 0.5); 
-                    const activeId = GLOBAL_STORE.activeTabId;
-                    if (GLOBAL_STORE.tabs && GLOBAL_STORE.tabs[activeId]) {
-                        if (!GLOBAL_STORE.tabs[activeId].cats) GLOBAL_STORE.tabs[activeId].cats = {};
-                        if (!GLOBAL_STORE.tabs[activeId].cats[slotId]) GLOBAL_STORE.tabs[activeId].cats[slotId] = {};
-                        GLOBAL_STORE.tabs[activeId].cats[slotId].img = base64Result; saveToCloud(); renderActiveContent();
-                    }
+                img.onerror = fail;
+                img.onload = async function() {
+                    try {
+                        const canvas = document.createElement('canvas');
+                        const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
+                        canvas.width = Math.max(1, Math.round(img.width * scale));
+                        canvas.height = Math.max(1, Math.round(img.height * scale));
+                        const ctx = canvas.getContext('2d');
+                        ctx.fillStyle = '#ffffff';
+                        ctx.fillRect(0, 0, canvas.width, canvas.height);
+                        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                        const result = canvas.toDataURL('image/jpeg', 0.85);
+                        const current = GLOBAL_STORE.tabs?.[tabId];
+                        if (CURRENT_USER_UID !== userUid || !current || current.isLocked !== false ||
+                            (current.cats?.[slotId]?.img || '') !== previousImage) return;
+                        const candidate = JSON.parse(JSON.stringify(GLOBAL_STORE));
+                        if (!candidate.tabs[tabId].cats) candidate.tabs[tabId].cats = {};
+                        if (!candidate.tabs[tabId].cats[slotId]) candidate.tabs[tabId].cats[slotId] = {};
+                        candidate.tabs[tabId].cats[slotId].img = result;
+                        // Firestore document limit is 1 MiB; reserve room for field metadata and text edits.
+                        if (new TextEncoder().encode(JSON.stringify(candidate)).length > 900000) {
+                            alert('目前雲端照片容量不足，這張照片尚未更換。請先移除不需要的照片，再重新上傳。');
+                            input.value = '';
+                            return;
+                        }
+                        if (!current.cats) current.cats = {};
+                        if (!current.cats[slotId]) current.cats[slotId] = {};
+                        current.cats[slotId].img = result;
+                        if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
+                        try {
+                            await db.collection('users').doc(userUid).set(GLOBAL_STORE);
+                        } catch (error) {
+                            const latest = GLOBAL_STORE.tabs?.[tabId]?.cats?.[slotId];
+                            if (latest?.img === result) latest.img = previousImage;
+                            if (GLOBAL_STORE.activeTabId === tabId) renderActiveContent();
+                            alert('照片未能儲存到雲端，請確認連線後重新上傳。');
+                        }
+                    } catch (error) { fail(); }
                 };
                 img.src = e.target.result;
             };
